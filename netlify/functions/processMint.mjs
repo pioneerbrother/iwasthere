@@ -1,7 +1,7 @@
-const fetch = require('node-fetch');
-const FormData = require('form-data');
-const { ethers } = require('ethers'); // Using ethers v5 for compatibility with current Hardhat setup
-const { getStore } = require("@netlify/blobs");
+import fetch from 'node-fetch';
+import FormData from 'form-data';
+import { ethers } from 'ethers';
+import { getStore } from "@netlify/blobs";
 
 const PINATA_API_KEY = process.env.PINATA_API_KEY; 
 const PINATA_SECRET_API_KEY = process.env.PINATA_SECRET_API_KEY;

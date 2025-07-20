@@ -1,4 +1,4 @@
-const { getStore } = require("@netlify/blobs"); // Import Netlify Blobs
+import { getStore } from "@netlify/blobs";
 
 exports.handler = async function(event, context) {
     if (event.httpMethod !== 'POST') {

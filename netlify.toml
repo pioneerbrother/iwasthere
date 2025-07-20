@@ -1,7 +1,13 @@
 [build]
   publish = "dist"
   command = "npm run build"
-  functions = "netlify/functions" # This line is critical!
+  functions = "netlify/functions"
+
+# --- ADD THIS ENTIRE BLOCK ---
+[functions]
+  node_bundler = "esbuild"
+  # This tells Netlify to treat .mjs files as first-class functions
+  included_files = ["!node_modules/ethers/dist/ethers.umd.js"]
 
 [[redirects]]
   from = "/*"
