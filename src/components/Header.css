@@ -1,0 +1,29 @@
+.app-header {
+  width: 100%;
+  padding: 15px 40px;
+  background-color: #f0f0f0; /* Light background for header */
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center; /* Center the header content */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: #333; /* Dark text for contrast */
+}
+
+.logo-img {
+  height: 50px; /* Adjust size as needed */
+  margin-right: 15px;
+}
+
+.logo-text {
+  font-size: 2rem;
+  font-weight: bold;
+  font-family: 'Arial', sans-serif; /* A simple, clear font */
+  color: #333;
+}

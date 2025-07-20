@@ -1,0 +1,148 @@
+.homepage-main-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 80px); /* Adjust for header height */
+    padding: 20px;
+    background-color: #f8f9fa;
+    color: #333;
+    font-family: 'Arial', sans-serif;
+}
+
+.mint-card {
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    padding: 40px;
+    text-align: center;
+    max-width: 500px;
+    width: 100%;
+}
+
+.card-title {
+    font-size: 2.2rem;
+    color: #212529;
+    margin-bottom: 15px;
+}
+
+.card-subtitle {
+    font-size: 1.1rem;
+    color: #666;
+    margin-bottom: 30px;
+}
+
+.supply-info, .price-info {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #555;
+    margin-bottom: 15px;
+}
+
+.action-button {
+    padding: 15px 30px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    min-width: 250px;
+}
+
+.connect-button {
+    background-color: #007bff;
+}
+
+.connect-button:hover {
+    background-color: #0056b3;
+}
+
+.mint-button {
+    background-color: #28a745;
+}
+
+.mint-button:hover:not(:disabled) {
+    background-color: #218838;
+}
+
+.action-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.status-text {
+    font-size: 1rem;
+    color: #007bff;
+    margin-top: 20px;
+    min-height: 20px; /* Reserve space */
+}
+
+.feedback-text {
+    font-size: 0.95rem;
+    color: #dc3545; /* Red for errors */
+    margin-top: 20px;
+    min-height: 20px; /* Reserve space */
+}
+
+.gallery-link-prompt {
+    margin-top: 30px;
+    font-size: 1rem;
+}
+.gallery-link-prompt a {
+    color: #007bff;
+    text-decoration: none;
+    font-weight: bold;
+}
+.gallery-link-prompt a:hover {
+    text-decoration: underline;
+}
+
+/* New styles for file upload section */
+.file-upload-section {
+    margin-bottom: 25px;
+    padding: 20px;
+    border: 2px dashed #007bff;
+    border-radius: 8px;
+    background-color: #eaf5ff;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    position: relative; /* Needed for absolute positioning of input */
+    overflow: hidden; /* Hide any overflow from input */
+    min-height: 80px; /* Ensure visible area even if no files selected */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+.file-upload-section:hover {
+    background-color: #d8eaff;
+}
+
+.file-input {
+    position: absolute; /* Position it over the custom area */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0; /* Hide the default file input button */
+    cursor: pointer;
+    z-index: 10; /* Ensure it's clickable */
+}
+
+.file-prompt-text {
+    color: #0056b3;
+    font-weight: bold;
+    text-align: center;
+    margin: 0;
+    z-index: 5; /* Ensure text is behind hidden input */
+}
+
+.selected-files-info {
+    font-size: 0.9rem;
+    color: #333;
+    text-align: center;
+    margin: 0;
+    z-index: 5;
+}

@@ -1,0 +1,9 @@
+[build]
+  publish = "dist"
+  command = "npm run build"
+  functions = "netlify/functions" # This line is critical!
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
