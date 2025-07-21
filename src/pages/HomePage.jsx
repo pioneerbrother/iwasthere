@@ -3,9 +3,9 @@ import { ethers } from 'ethers';
 import { WalletContext } from '../contexts/WalletContext.jsx';
 import './HomePage.css';
 
-import IWasThereABI from '../abis/IWasThere.json';
-import ERC20ABI_file from '../abis/ERC20.json';
-const ERC20ABI = ERC20ABI_file.abi;
+import IWasThereABI from '../abis/IWasThere.json'; // Imports the array directly
+import ERC20ABI_file from '../abis/ERC20.json'; // Imports the object { "abi": [...] }
+const ERC20ABI = ERC20ABI_file.abi; // Extracts the array from the object
 
 const iWasThereNFTAddress = import.meta.env.VITE_IWAS_THERE_NFT_ADDRESS;
 const usdcAddress = import.meta.env.VITE_USDC_ADDRESS;
