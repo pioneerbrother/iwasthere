@@ -3,14 +3,8 @@
   command = "npm run build"
   functions = "netlify/functions"
 
-# This block tells Netlify to use the modern 'esbuild' bundler,
-# which is essential for correctly handling .mjs files and their 'import' statements.
-[functions]
-  node_bundler = "esbuild"
-
-# This block applies a specific, longer timeout to your processMint function.
-# The name MUST match your file name exactly.
-[functions."processMint.mjs"]
+# This block is for .js files and applies the timeout
+[functions."processMint.js"]
   timeout = 120 # Timeout in seconds
 
 [[redirects]]
