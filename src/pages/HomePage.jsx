@@ -62,7 +62,8 @@ function HomePage() {
                 return;
             }
             try {
-                const readOnlyProvider = new ethers.JsonRpcProvider(publicRpcUrl);
+                // Ethers v5 syntax for creating a read-only provider
+                const readOnlyProvider = new ethers.providers.JsonRpcProvider(publicRpcUrl);
                 const contract = new ethers.Contract(iWasThereNFTAddress, IWasThereABI, readOnlyProvider);
                 
                 const [currentMinted, currentMax] = await Promise.all([
@@ -76,6 +77,7 @@ function HomePage() {
                 setFeedback("Could not fetch contract data. The network may be busy.");
             }
         };
+
         fetchData();
         if (account) {
             checkFreeMint();
@@ -122,120 +124,107 @@ function HomePage() {
     }, []);
 
     const handleMint = useCallback(async () => {
-    console.log("--- MINT PROCESS STARTED ---");
-    if (!signer) {
-        setFeedback("Please connect your wallet first.");
-        console.log("Mint cancelled: Signer not available.");
-        return;
-    }
-    if (selectedFiles.length === 0) {
-        setFeedback("Please select at least one file to chronicle.");
-        console.log("Mint cancelled: No files selected.");
-        return;
-    }
-    console.log(`isFreeMintAvailable state is: ${isFreeMintAvailable}`);
-
-    setIsLoading(true);
-    setFeedback("1/4: Preparing your files...");
-
-    try {
-        const filesData = await Promise.all(selectedFiles.map(file => new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve({
-                fileName: file.name,
-                fileContentBase64: reader.result.split(',')[1],
-                fileType: file.type
-            });
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        })));
-        console.log("Step 1/4 successful: Files prepared for upload.");
-
-        setFeedback("2/4: Awaiting wallet signature for secure upload...");
-        const messageToSign = `ChronicleMe: Verifying access for ${account} to upload media and request mint.`;
-        const signature = await signer.signMessage(messageToSign);
-        console.log("Step 2/4 successful: Message signed.");
-
-        console.log("Step 3/4: Sending request to backend function 'processMint'...");
-        const processMintResponse = await fetch('/.netlify/functions/processMint', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                files: filesData,
-                walletAddress: account,
-                signature: signature,
-                isFreeMint: isFreeMintAvailable,
-                title: `Chronicle Bundle by ${account}`,
-                description: `A collection of memories chronicled by ${account}.`
-            }),
-        });
-        
-        console.log("Backend response received with status:", processMintResponse.status);
-        if (!processMintResponse.ok) {
-    const errorText = await processMintResponse.text(); // Get response as text
-    console.error("Backend function returned an error:", errorText);
-    // Try to parse as JSON, but fall back to the raw text if it fails
-    try {
-        const errorJson = JSON.parse(errorText);
-        throw new Error(errorJson.error || "Minting process failed on the backend.");
-    } catch (e) {
-        throw new Error(errorText || "Minting process failed on the backend.");
-    }
-}
-        const processMintResult = await processMintResponse.json();
-
-        if (!processMintResponse.ok) {
-            console.error("Backend function returned an error:", processMintResult);
-            throw new Error(processMintResult.error || "Minting process failed on the backend.");
+        console.log("--- MINT PROCESS STARTED (v5) ---");
+        if (!signer) {
+            setFeedback("Please connect your wallet first.");
+            console.log("Mint cancelled: Signer not available.");
+            return;
         }
-        console.log("Step 3/4 successful: Backend processed request.", processMintResult);
+        if (selectedFiles.length === 0) {
+            setFeedback("Please select at least one file to chronicle.");
+            console.log("Mint cancelled: No files selected.");
+            return;
+        }
+        console.log(`isFreeMintAvailable state is: ${isFreeMintAvailable}`);
 
-        const ipfsMetadataCid = `ipfs://${processMintResult.metadataCID}`;
-        
-        if (isFreeMintAvailable) {
-            setFeedback("🎉 Success! Your FREE Chronicle Bundle is on the blockchain!");
-            console.log("--- MINT PROCESS COMPLETED (FREE) ---");
-        } else {
-            setFeedback("3/4: Approving USDC...");
-            const iWasThereContract = new ethers.Contract(iWasThereNFTAddress, IWasThereABI, signer);
-            const usdcContract = new ethers.Contract(usdcAddress, ERC20ABI, signer);
-            const contractMintPrice = await iWasThereContract.mintPrice();
+        setIsLoading(true);
+        setFeedback("1/4: Preparing your files...");
 
-            const allowance = await usdcContract.allowance(account, iWasThereNFTAddress);
+        try {
+            const filesData = await Promise.all(selectedFiles.map(file => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve({
+                    fileName: file.name,
+                    fileContentBase64: reader.result.split(',')[1],
+                    fileType: file.type
+                });
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            })));
+            console.log("Step 1/4 successful: Files prepared for upload.");
+
+            setFeedback("2/4: Awaiting wallet signature for secure upload...");
+            const messageToSign = `ChronicleMe: Verifying access for ${account} to upload media and request mint.`;
+            const signature = await signer.signMessage(messageToSign);
+            console.log("Step 2/4 successful: Message signed.");
+
+            console.log("Step 3/4: Sending request to backend function 'processMint'...");
+            const processMintResponse = await fetch('/.netlify/functions/processMint', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    files: filesData,
+                    walletAddress: account,
+                    signature: signature,
+                    isFreeMint: isFreeMintAvailable,
+                    title: `Chronicle Bundle by ${account}`,
+                    description: `A collection of memories chronicled by ${account}.`
+                }),
+            });
             
-            // --- THIS IS THE KEY FIX ---
-            if (allowance.lt(contractMintPrice)) { // Use .lt() for "less than"
-                const approveTx = await usdcContract.approve(iWasThereNFTAddress, contractMintPrice);
-                await approveTx.wait();
-                console.log("USDC approval transaction successful.");
-                setFeedback("USDC approved. Sending mint transaction...");
+            console.log("Backend response received with status:", processMintResponse.status);
+            const processMintResult = await processMintResponse.json();
+
+            if (!processMintResponse.ok) {
+                console.error("Backend function returned an error:", processMintResult);
+                throw new Error(processMintResult.error || "Minting process failed on the backend.");
+            }
+            console.log("Step 3/4 successful: Backend processed request.", processMintResult);
+
+            const ipfsMetadataCid = `ipfs://${processMintResult.metadataCID}`;
+            
+            if (isFreeMintAvailable) {
+                setFeedback("🎉 Success! Your FREE Chronicle Bundle is on the blockchain!");
+                console.log("--- MINT PROCESS COMPLETED (FREE) ---");
             } else {
-                console.log("USDC allowance was sufficient.");
-                setFeedback("Sending mint transaction...");
+                setFeedback("3/4: Approving USDC...");
+                const iWasThereContract = new ethers.Contract(iWasThereNFTAddress, IWasThereABI, signer);
+                const usdcContract = new ethers.Contract(usdcAddress, ERC20ABI, signer);
+                const contractMintPrice = await iWasThereContract.mintPrice();
+
+                const allowance = await usdcContract.allowance(account, iWasThereNFTAddress);
+                
+                if (allowance.lt(contractMintPrice)) {
+                    const approveTx = await usdcContract.approve(iWasThereNFTAddress, contractMintPrice);
+                    await approveTx.wait();
+                    console.log("USDC approval transaction successful.");
+                    setFeedback("USDC approved. Sending mint transaction...");
+                } else {
+                    console.log("USDC allowance was sufficient.");
+                    setFeedback("Sending mint transaction...");
+                }
+
+                const mintTx = await iWasThereContract.mint(account, ipfsMetadataCid);
+                setFeedback("4/4: Finalizing on blockchain...");
+                await mintTx.wait();
+                console.log("Paid mint transaction successful.");
+                setFeedback("🎉 Success! Your Chronicle Bundle is on the blockchain!");
+                console.log("--- MINT PROCESS COMPLETED (PAID) ---");
             }
 
-            const mintTx = await iWasThereContract.mint(account, ipfsMetadataCid);
-            setFeedback("4/4: Finalizing on blockchain...");
-            await mintTx.wait();
-            console.log("Paid mint transaction successful.");
-            setFeedback("🎉 Success! Your Chronicle Bundle is on the blockchain!");
-            console.log("--- MINT PROCESS COMPLETED (PAID) ---");
+            setSelectedFiles([]);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+            setMintedCount(prev => prev + 1);
+            checkFreeMint();
+        } catch (error) {
+            console.error("CRITICAL ERROR in handleMint:", error);
+            setFeedback(`Error: ${error.reason || error.message || "An unknown error occurred."}`);
+            console.log("--- MINT PROCESS FAILED ---");
+        } finally {
+            setIsLoading(false);
         }
+    }, [account, signer, selectedFiles, isFreeMintAvailable, checkFreeMint]);
 
-        setSelectedFiles([]);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-        setMintedCount(prev => prev + 1);
-        checkFreeMint();
-    } catch (error) {
-        console.error("CRITICAL ERROR in handleMint:", error);
-        setFeedback(`Error: ${error.reason || error.message || "An unknown error occurred."}`);
-        console.log("--- MINT PROCESS FAILED ---");
-    } finally {
-        setIsLoading(false);
-    }
-}, [account, signer, selectedFiles, isFreeMintAvailable, checkFreeMint]);
-   
-           
     const mintButtonText = () => {
         if (isLoading) return "Processing...";
         if (!account) return "Connect Wallet";

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, createContext, useCallback } from 'react';
 import { ethers } from 'ethers';
-
 import { WalletContext } from '../contexts/WalletContext.jsx';
 
 const WalletProvider = ({ children }) => {
@@ -17,20 +16,19 @@ const WalletProvider = ({ children }) => {
         }
         setIsConnecting(true);
         try {
-            const web3Provider = new ethers.BrowserProvider(window.ethereum, "any");
-            const accounts = await web3Provider.send("eth_requestAccounts", []);
+            // Ethers v5 syntax for browser provider
+            const web3Provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+            await web3Provider.send("eth_requestAccounts", []);
             
-            if (accounts.length > 0) {
-                const connectedAccount = ethers.getAddress(accounts[0]);
-                const network = await web3Provider.getNetwork();
-                const newSigner = await web3Provider.getSigner();
-                
-                setProvider(web3Provider);
-                setSigner(newSigner);
-                setChainId(Number(network.chainId));
-                setAccount(connectedAccount);
-                console.log("WalletProvider: Successfully connected.", connectedAccount);
-            }
+            const newSigner = web3Provider.getSigner();
+            const connectedAccount = await newSigner.getAddress();
+            const network = await web3Provider.getNetwork();
+            
+            setProvider(web3Provider);
+            setSigner(newSigner);
+            setChainId(Number(network.chainId));
+            setAccount(connectedAccount);
+            console.log("WalletProvider: Successfully connected.", connectedAccount);
         } catch (error) {
             console.error("WalletProvider: Error connecting wallet.", error);
             if (error.code !== 4001) { 
@@ -46,7 +44,6 @@ const WalletProvider = ({ children }) => {
 
         const handleAccountsChanged = (accounts) => {
             if (accounts.length > 0) {
-                setAccount(ethers.getAddress(accounts[0]));
                 connectWallet();
             } else {
                 setAccount(null);
@@ -70,14 +67,7 @@ const WalletProvider = ({ children }) => {
         };
     }, [connectWallet]);
 
-    const value = {
-        account,
-        signer,
-        chainId,
-        provider,
-        isConnecting,
-        connectWallet
-    };
+    const value = { account, signer, chainId, provider, isConnecting, connectWallet };
 
     return (
         <WalletContext.Provider value={value}>

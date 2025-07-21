@@ -1,23 +1,22 @@
-import { getStore } from "@netlify/blobs";
+const { getStore } = require("@netlify/blobs");
 
-export const handler = async function(event, context) {
+exports.handler = async function(event, context) {
     if (event.httpMethod !== 'POST') {
-        return { statusCode: 405, body: 'Method Not Allowed' };
+        return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
     }
 
     try {
         const { walletAddress } = JSON.parse(event.body);
 
         if (!walletAddress) {
-            return { statusCode: 400, body: 'Missing walletAddress.' };
+            return { statusCode: 400, body: JSON.stringify({ error: 'Missing walletAddress.' }) };
         }
 
-        // Get your Blob store. The name must match what you configured in Netlify UI
-       const freeMintStore = getStore({
-    name: "iwasthere-free-mints",
-    siteID: process.env.NETLIFY_SITE_ID,
-    token: process.env.NETLIFY_API_TOKEN
-});
+        const freeMintStore = getStore({
+            name: "iwasthere-free-mints",
+            siteID: process.env.NETLIFY_SITE_ID,
+            token: process.env.NETLIFY_API_TOKEN
+        });
         const hasUsedFreeMint = await freeMintStore.get(walletAddress.toLowerCase());
 
         const isAvailable = hasUsedFreeMint ? false : true;
