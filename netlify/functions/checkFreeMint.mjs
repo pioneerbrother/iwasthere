@@ -1,6 +1,6 @@
 import { getStore } from "@netlify/blobs";
 
-exports.handler = async function(event, context) {
+export const handler = async function(event, context) {
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
