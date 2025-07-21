@@ -3,120 +3,106 @@ import FormData from 'form-data';
 import { ethers } from 'ethers';
 import { getStore } from "@netlify/blobs";
 
-const PINATA_API_KEY = process.env.PINATA_API_KEY; 
+// Environment variables are automatically loaded by Netlify
+const PINATA_API_KEY = process.env.PINATA_API_KEY;
 const PINATA_SECRET_API_KEY = process.env.PINATA_SECRET_API_KEY;
-const OWNER_PRIVATE_KEY_FOR_FREE_MINTS = process.env.OWNER_PRIVATE_KEY_FOR_FREE_MINTS; // !! CRITICAL !!
-const IWAS_THERE_NFT_ADDRESS = process.env.VITE_IWAS_THERE_NFT_ADDRESS; // Passed via Netlify ENV
-const POLYGON_RPC_URL = process.env.POLYGON_RPC_URL || "https://polygon-rpc.com"; // For the backend relayer to connect
+const OWNER_PRIVATE_KEY_FOR_FREE_MINTS = process.env.OWNER_PRIVATE_KEY_FOR_FREE_MINTS;
+const IWAS_THERE_NFT_ADDRESS = process.env.IWAS_THERE_NFT_ADDRESS;
+const POLYGON_RPC_URL = process.env.POLYGON_RPC_URL;
 
 const PINATA_BASE_URL = 'https://api.pinata.cloud/';
 
-// Minimal ABI for mintFree and other relevant functions
+// Minimal ABI needed for the relayer to call the mintFree function
 const IWAS_THERE_ABI_MINIMAL = [
-    "function mint(address to, string memory _tokenURI)",
-    "function mintFree(address to, string memory _tokenURI)", // The function for free mints
-    "function mintPrice() view returns (uint256)",
-    "function allowance(address owner, address spender) view returns (uint256)",
-    "function approve(address spender, uint256 amount) returns (bool)"
+    "function mintFree(address to, string memory _tokenURI)"
 ];
 
-exports.handler = async function(event, context) {
-    if (event.httpMethod !== 'POST') {
-        return { statusCode: 405, body: 'Method Not Allowed' };
-    }
-
-    if (!PINATA_API_KEY || !PINATA_SECRET_API_KEY) {
-        return { statusCode: 500, body: 'Pinata API keys are not configured as Netlify Environment Variables.' };
-    }
-    // Only require OWNER_PRIVATE_KEY_FOR_FREE_MINTS if a free mint is attempted
-    if (JSON.parse(event.body).isFreeMint && !OWNER_PRIVATE_KEY_FOR_FREE_MINTS) {
-        return { statusCode: 500, body: 'Owner private key for free mints is not configured.' };
-    }
-    if (!IWAS_THERE_NFT_ADDRESS) {
-        return { statusCode: 500, body: 'IWasThere NFT contract address is not configured.' };
-    }
+export const handler = async function(event, context) {
+    console.log("--- processMint function invoked ---");
 
     try {
-        const { files, walletAddress, signature, isFreeMint, title, description } = JSON.parse(event.body);
-
-        if (!files || !Array.isArray(files) || files.length === 0 || !walletAddress || !signature) {
-            return { statusCode: 400, body: 'Missing or invalid fields (files array, walletAddress, signature).' };
+        if (event.httpMethod !== 'POST') {
+            return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
         }
-
-        // 1. Verify Wallet Signature (Gasless Identity Proof)
-        const message = `ChronicleMe: Verifying access for ${walletAddress} to upload media and request mint.`;
-        const recoveredAddress = ethers.utils.verifyMessage(message, signature); // Use ethers.utils.verifyMessage for v5
-
-        if (recoveredAddress.toLowerCase() !== walletAddress.toLowerCase()) {
-            return { statusCode: 401, body: 'Invalid wallet signature. Unauthorized.' };
-        }
-
-        const freeMintStore = getStore("iwasthere-free-mints");
         
-        // --- Free Mint Eligibility Check & Consumption ---
+        console.log("Parsing event body...");
+        const { files, walletAddress, signature, isFreeMint, title, description } = JSON.parse(event.body);
+        console.log(`Request received for wallet: ${walletAddress}, isFreeMint attempt: ${isFreeMint}`);
+
+        if (!files || !walletAddress || !signature) {
+             throw new Error("Missing required fields in request body.");
+        }
+
+        console.log("Step 1: Verifying wallet signature...");
+        const message = `ChronicleMe: Verifying access for ${walletAddress} to upload media and request mint.`;
+        const recoveredAddress = ethers.utils.verifyMessage(message, signature);
+        if (recoveredAddress.toLowerCase() !== walletAddress.toLowerCase()) {
+            throw new Error("Invalid wallet signature. Unauthorized.");
+        }
+        console.log("Signature verified successfully.");
+
+        const freeMintStore = getStore({
+            name: "iwasthere-free-mints",
+            siteID: process.env.NETLIFY_SITE_ID,
+            token: process.env.NETLIFY_API_TOKEN
+        });
+
         if (isFreeMint) {
+            console.log("Checking Blob store for free mint eligibility...");
             const hasUsedFreeMint = await freeMintStore.get(walletAddress.toLowerCase());
             if (hasUsedFreeMint) {
-                // IMPORTANT: This should ideally not happen if frontend check is good, but is a server-side double-check
-                return { statusCode: 403, body: 'Free mint already used for this wallet. Please try a paid mint.' };
+                console.error("Attempted to use free mint, but it was already used.");
+                throw new Error("Free mint already used for this wallet.");
             }
+            console.log("User is eligible for a free mint.");
         }
 
-        // 2. Upload Each File to Pinata Individually
+        console.log(`Step 2: Uploading ${files.length} file(s) to Pinata...`);
         const mediaCIDs = [];
         for (const fileData of files) {
             const fileBuffer = Buffer.from(fileData.fileContentBase64, 'base64');
-            const fileName = fileData.fileName;
-            const fileType = fileData.fileType;
-
             const formData = new FormData();
-            formData.append('file', fileBuffer, { filename: fileName, contentType: fileType });
+            formData.append('file', fileBuffer, { filename: fileData.fileName, contentType: fileData.fileType });
             
             const pinataFileRes = await fetch(`${PINATA_BASE_URL}pinning/pinFileToIPFS`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${PINATA_API_KEY}`,
-                    ...formData.getHeaders() // Important for multipart/form-data
+                    ...formData.getHeaders()
                 },
                 body: formData
             });
 
             if (!pinataFileRes.ok) {
                 const errorText = await pinataFileRes.text();
-                console.error(`Pinata file upload failed for ${fileName}:`, errorText);
-                throw new Error(`Pinata file upload failed for ${fileName}: ${errorText}`);
+                throw new Error(`Pinata file upload failed for ${fileData.fileName}: ${errorText}`);
             }
             const fileResult = await pinataFileRes.json();
-            mediaCIDs.push({ cid: fileResult.IpfsHash, fileName: fileName, fileType: fileType });
+            mediaCIDs.push({ cid: fileResult.IpfsHash, fileName: fileData.fileName, fileType: fileData.fileType });
         }
+        console.log("All files uploaded to Pinata successfully.");
 
-        // 3. Create NFT Metadata JSON (linking to all media CIDs)
+        console.log("Step 3: Creating and uploading metadata...");
         const nftMetadata = {
             name: title || `Chronicle Bundle by ${walletAddress}`,
             description: description || `A collection of immutable memories chronicled by ${walletAddress}.`,
-            image: mediaCIDs[0] && mediaCIDs[0].fileType.startsWith('image/') ? `ipfs://${mediaCIDs[0].cid}` : undefined,
-            animation_url: mediaCIDs[0] && mediaCIDs[0].fileType.startsWith('video/') ? `ipfs://${mediaCIDs[0].cid}` : undefined,
+            image: mediaCIDs[0] && mediaCIDs[0].fileType.startsWith('image/') ? `ipfs://${mediaCIDs[0].cid}` : null,
+            animation_url: mediaCIDs[0] && mediaCIDs[0].fileType.startsWith('video/') ? `ipfs://${mediaCIDs[0].cid}` : null,
             properties: {
                 media: mediaCIDs.map(item => ({
                     cid: item.cid,
                     fileName: item.fileName,
                     fileType: item.fileType,
                     ipfsUrl: `ipfs://${item.cid}`
-                })),
-                uploader: walletAddress,
-                timestamp: new Date().toISOString()
+                }))
             },
             attributes: [
-                { trait_type: "Uploader", value: walletAddress },
-                { trait_type: "Timestamp", value: new Date().toISOString() },
-                { trait_type: "File Count", value: mediaCIDs.length },
-                { trait_type: "Initial Content Type", value: mediaCIDs.length > 0 ? mediaCIDs[0].fileType : "Unknown" }
+                { "trait_type": "Uploader", "value": walletAddress },
+                { "trait_type": "File Count", "value": mediaCIDs.length }
             ]
         };
 
         const metadataBuffer = Buffer.from(JSON.stringify(nftMetadata));
-
-        // 4. Upload Metadata JSON to Pinata
         const metadataFormData = new FormData();
         metadataFormData.append('file', metadataBuffer, { filename: 'metadata.json', contentType: 'application/json' });
 
@@ -128,47 +114,46 @@ exports.handler = async function(event, context) {
 
         if (!pinataMetadataRes.ok) {
             const errorText = await pinataMetadataRes.text();
-            console.error("Pinata metadata upload failed:", errorText);
             throw new Error(`Pinata metadata upload failed: ${errorText}`);
         }
         const metadataResult = await pinataMetadataRes.json();
         const metadataCID = metadataResult.IpfsHash;
+        console.log("Metadata uploaded successfully. CID:", metadataCID);
 
-        // --- Step 5: Conditionally Mint on Blockchain (Backend acts as Relayer for Free Mints) ---
         if (isFreeMint) {
-            console.log(`Attempting FREE mint for ${walletAddress} via relayer...`);
-            // Set up ethers provider and wallet for the owner/relayer
-            const provider = new ethers.providers.JsonRpcProvider(POLYGON_RPC_URL); // Using ethers v5 provider
+            console.log("Step 4: Processing FREE mint via backend relayer...");
+            if (!OWNER_PRIVATE_KEY_FOR_FREE_MINTS) throw new Error("Relayer private key is not configured.");
+            
+            const provider = new ethers.JsonRpcProvider(POLYGON_RPC_URL);
             const ownerWallet = new ethers.Wallet(OWNER_PRIVATE_KEY_FOR_FREE_MINTS, provider);
             const iWasThereContract = new ethers.Contract(IWAS_THERE_NFT_ADDRESS, IWAS_THERE_ABI_MINIMAL, ownerWallet);
 
-            // Call the mintFree function
-            // Add a gas limit or estimate gas to prevent out-of-gas errors
-            const gasLimit = await iWasThereContract.estimateGas.mintFree(walletAddress, `ipfs://${metadataCID}`);
-            const tx = await iWasThereContract.mintFree(walletAddress, `ipfs://${metadataCID}`, {
-                gasLimit: gasLimit.mul(120).div(100) // Add 20% buffer
-            });
-            await tx.wait(); // Wait for transaction to be mined
+            console.log(`Relayer wallet (${ownerWallet.address}) is calling mintFree for user (${walletAddress})...`);
+            const tx = await iWasThereContract.mintFree(walletAddress, `ipfs://${metadataCID}`);
+            console.log("Transaction sent. Waiting for confirmation. TxHash:", tx.hash);
+            await tx.wait();
+            console.log("Free mint transaction confirmed.");
 
-            // Mark free mint as used in Blob store ONLY AFTER successful transaction
+            console.log("Updating Blob store to mark free mint as used...");
             await freeMintStore.set(walletAddress.toLowerCase(), "used");
+            console.log("Blob store updated.");
 
             return {
                 statusCode: 200,
-                body: JSON.stringify({ metadataCID, mediaCIDs, message: "Free Chronicle Bundle minted successfully!" })
+                body: JSON.stringify({ metadataCID, message: "Free Chronicle Bundle minted successfully!" })
             };
-
         } else {
-            // For PAID mints, the frontend will handle the USDC approval and contract.mint() call.
-            // This function simply returns the metadata CID needed for the on-chain mint.
+            console.log("Step 4: Returning metadata CID to frontend for PAID mint.");
             return {
                 statusCode: 200,
-                body: JSON.stringify({ metadataCID, mediaCIDs, message: "Files uploaded to IPFS. Ready for on-chain mint." })
+                body: JSON.stringify({ metadataCID, message: "Files uploaded. Ready for on-chain mint." })
             };
         }
-
     } catch (error) {
-        console.error("Serverless function error:", error);
-        return { statusCode: 500, body: JSON.stringify({ error: error.message || "Internal Server Error" }) };
+        console.error("--- CRITICAL ERROR in processMint function ---", error);
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ error: error.message || "An internal server error occurred." })
+        };
     }
 };
