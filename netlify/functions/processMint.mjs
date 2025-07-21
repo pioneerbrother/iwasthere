@@ -90,16 +90,27 @@ export const handler = async (event, context) => {
         const metadataResult = await pinataMetadataRes.json();
         const metadataCID = metadataResult.IpfsHash;
 
-        if (isFreeMint) {
+       if (isFreeMint) {
             if (!OWNER_PRIVATE_KEY_FOR_FREE_MINTS) throw new Error("Relayer key not configured.");
             
-            // Correct Ethers v5 syntax with default import
             const provider = new ethers.providers.JsonRpcProvider(POLYGON_RPC_URL);
             const ownerWallet = new ethers.Wallet(OWNER_PRIVATE_KEY_FOR_FREE_MINTS, provider);
             const iWasThereContract = new ethers.Contract(IWAS_THERE_NFT_ADDRESS, IWAS_THERE_ABI_MINIMAL, ownerWallet);
 
-            const tx = await iWasThereContract.mintFree(walletAddress, `ipfs://${metadataCID}`);
-            await tx.wait();
+            // --- THIS IS THE CRITICAL FIX ---
+            // Manually set gas parameters to prevent hanging
+            const gasPrice = await provider.getGasPrice();
+            const txOverrides = {
+                gasLimit: 300000, // A generous, fixed gas limit for a simple mint
+                gasPrice: gasPrice.mul(12).div(10), // Set gas price to 20% above current network price
+            };
+
+            console.log(`Sending mintFree tx for ${walletAddress} with overrides:`, txOverrides);
+            const tx = await iWasThereContract.mintFree(walletAddress, `ipfs://${metadataCID}`, txOverrides);
+            
+            console.log("Transaction sent, waiting for confirmation... Hash:", tx.hash);
+            await tx.wait(); // This will no longer hang
+            console.log("Transaction confirmed!");
 
             await freeMintStore.set(walletAddress.toLowerCase(), "used");
 
