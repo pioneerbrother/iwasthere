@@ -3,7 +3,12 @@
   command = "npm run build"
   functions = "netlify/functions"
 
+# --- ADD OR VERIFY THIS BLOCK ---
+# Increase the timeout for the processMint function specifically
+[functions."processMint"]
+  timeout = 60 # Timeout in seconds
+
 [[redirects]]
   from = "/*"
-  to = "/index.html"
+  to = "index.html"
   status = 200
