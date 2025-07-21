@@ -3,7 +3,10 @@
   command = "npm run build"
   functions = "netlify/functions"
 
-[functions."processMint.js"]
+[functions]
+  node_bundler = "esbuild"
+
+[functions."processMint.mjs"]
   timeout = 120
 
 [[redirects]]
