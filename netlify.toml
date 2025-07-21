@@ -6,7 +6,7 @@
 # --- ADD THIS BLOCK ---
 # Increase the timeout for the processMint function specifically
 [functions."processMint.js"] # Make sure the name matches your file name
-  timeout = 90 # Timeout in seconds
+  timeout = 120 # Timeout in seconds
 
 [[redirects]]
   from = "/*"
