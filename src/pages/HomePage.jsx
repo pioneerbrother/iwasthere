@@ -63,7 +63,7 @@ function HomePage() {
             }
             try {
                 // Use ethers.providers.JsonRpcProvider for ethers v5
-                const readOnlyProvider = new ethers.providers.JsonRpcProvider(publicRpcUrl);
+         const readOnlyProvider = new ethers.JsonRpcProvider(publicRpcUrl);
                 const contract = new ethers.Contract(iWasThereNFTAddress, IWasThereABI, readOnlyProvider);
                 
                 const [currentMinted, currentMax] = await Promise.all([
