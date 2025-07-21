@@ -145,4 +145,22 @@
     text-align: center;
     margin: 0;
     z-index: 5;
+
+    /* Add this to your HomePage.css file */
+.select-files-button {
+    background-color: #007bff;
+    color: white;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    margin-bottom: 10px;
+}
+
+.select-files-button:hover {
+    background-color: #0056b3;
+}
 }
