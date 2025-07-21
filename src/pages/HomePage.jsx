@@ -74,7 +74,6 @@ function HomePage() {
             } catch (error) {
                 console.error("Error fetching contract data:", error);
                 setFeedback("Could not fetch contract data. The network may be busy.");
-                setIsLoading(false);
             }
         };
         fetchData();
@@ -86,7 +85,7 @@ function HomePage() {
         }
     }, [iWasThereNFTAddress, publicRpcUrl, account, checkFreeMint]);
 
-    const handleFileChange = (event) => {
+    const handleFileChange = useCallback((event) => {
         const files = Array.from(event.target.files);
         let totalSize = 0;
         let photoCount = 0;
@@ -116,13 +115,13 @@ function HomePage() {
         
         setSelectedFiles(files);
         setFeedback("Files selected. Ready to Chronicle.");
-    };
+    }, []);
 
-    const triggerFileSelect = () => {
+    const triggerFileSelect = useCallback(() => {
         fileInputRef.current.click();
-    };
+    }, []);
 
-    const handleMint = async () => {
+    const handleMint = useCallback(async () => {
         console.log("--- MINT PROCESS STARTED ---");
         if (!signer) {
             setFeedback("Please connect your wallet first.");
@@ -192,7 +191,7 @@ function HomePage() {
                 const contractMintPrice = await iWasThereContract.mintPrice();
 
                 const allowance = await usdcContract.allowance(account, iWasThereNFTAddress);
-                if (allowance.lt(contractMintPrice)) { // Use .lt() for BigNumber comparison
+                if (allowance < contractMintPrice) {
                     const approveTx = await usdcContract.approve(iWasThereNFTAddress, contractMintPrice);
                     await approveTx.wait();
                     console.log("USDC approval transaction successful.");
@@ -221,7 +220,7 @@ function HomePage() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [account, signer, selectedFiles, isFreeMintAvailable, checkFreeMint]); // <-- KEY CHANGE: Add dependencies
 
     const mintButtonText = () => {
         if (isLoading) return "Processing...";
