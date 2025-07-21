@@ -14,7 +14,7 @@ const IWAS_THERE_ABI_MINIMAL = [
     "function mintFree(address to, string memory _tokenURI)"
 ];
 
-exports.handler = async function(event, context) {
+export const handler = async function(event, context) {
     console.log("--- processMint function invoked (v5) ---");
 
     try {
