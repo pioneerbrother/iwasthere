@@ -127,15 +127,12 @@ function HomePage() {
         console.log("--- MINT PROCESS STARTED (v5) ---");
         if (!signer) {
             setFeedback("Please connect your wallet first.");
-            console.log("Mint cancelled: Signer not available.");
             return;
         }
         if (selectedFiles.length === 0) {
             setFeedback("Please select at least one file to chronicle.");
-            console.log("Mint cancelled: No files selected.");
             return;
         }
-        console.log(`isFreeMintAvailable state is: ${isFreeMintAvailable}`);
 
         setIsLoading(true);
         setFeedback("1/4: Preparing your files...");
@@ -151,14 +148,14 @@ function HomePage() {
                 reader.onerror = reject;
                 reader.readAsDataURL(file);
             })));
-            console.log("Step 1/4 successful: Files prepared for upload.");
+            console.log("Step 1/4 successful: Files prepared.");
 
-            setFeedback("2/4: Awaiting wallet signature for secure upload...");
+            setFeedback("2/4: Awaiting wallet signature...");
             const messageToSign = `ChronicleMe: Verifying access for ${account} to upload media and request mint.`;
             const signature = await signer.signMessage(messageToSign);
             console.log("Step 2/4 successful: Message signed.");
 
-            console.log("Step 3/4: Sending request to backend function 'processMint'...");
+            console.log("Step 3/4: Sending request to backend...");
             const processMintResponse = await fetch('/.netlify/functions/processMint', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -176,15 +173,14 @@ function HomePage() {
             const processMintResult = await processMintResponse.json();
 
             if (!processMintResponse.ok) {
-                console.error("Backend function returned an error:", processMintResult);
-                throw new Error(processMintResult.error || "Minting process failed on the backend.");
+                throw new Error(processMintResult.error || "Backend process failed.");
             }
-            console.log("Step 3/4 successful: Backend processed request.", processMintResult);
+            console.log("Step 3/4 successful: Backend processed request.");
 
             const ipfsMetadataCid = `ipfs://${processMintResult.metadataCID}`;
             
             if (isFreeMintAvailable) {
-                setFeedback("🎉 Success! Your FREE Chronicle Bundle is on the blockchain!");
+                setFeedback("🎉 Success! Your FREE Chronicle is on the blockchain!");
                 console.log("--- MINT PROCESS COMPLETED (FREE) ---");
             } else {
                 setFeedback("3/4: Approving USDC...");
@@ -197,18 +193,12 @@ function HomePage() {
                 if (allowance.lt(contractMintPrice)) {
                     const approveTx = await usdcContract.approve(iWasThereNFTAddress, contractMintPrice);
                     await approveTx.wait();
-                    console.log("USDC approval transaction successful.");
-                    setFeedback("USDC approved. Sending mint transaction...");
-                } else {
-                    console.log("USDC allowance was sufficient.");
-                    setFeedback("Sending mint transaction...");
                 }
 
                 const mintTx = await iWasThereContract.mint(account, ipfsMetadataCid);
                 setFeedback("4/4: Finalizing on blockchain...");
                 await mintTx.wait();
-                console.log("Paid mint transaction successful.");
-                setFeedback("🎉 Success! Your Chronicle Bundle is on the blockchain!");
+                setFeedback("🎉 Success! Your Chronicle is on the blockchain!");
                 console.log("--- MINT PROCESS COMPLETED (PAID) ---");
             }
 
@@ -219,7 +209,6 @@ function HomePage() {
         } catch (error) {
             console.error("CRITICAL ERROR in handleMint:", error);
             setFeedback(`Error: ${error.reason || error.message || "An unknown error occurred."}`);
-            console.log("--- MINT PROCESS FAILED ---");
         } finally {
             setIsLoading(false);
         }
