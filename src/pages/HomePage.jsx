@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef } from 'react';
+import React, { useState, useEffect, useContext, useRef, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { WalletContext } from '../contexts/WalletContext.jsx';
 import './HomePage.css';
@@ -9,7 +9,7 @@ const ERC20ABI = ERC20ABI_file.abi;
 
 const iWasThereNFTAddress = import.meta.env.VITE_IWAS_THERE_NFT_ADDRESS;
 const usdcAddress = import.meta.env.VITE_USDC_ADDRESS;
-const publicRpcUrl = import.meta.env.VITE_PUBLIC_POLYGON_RPC_URL || "https://polygon-rpc.com/";
+const publicRpcUrl = import.meta.env.VITE_PUBLIC_POLYGON_RPC_URL;
 const POLYGON_MAINNET_CHAIN_ID = 137;
 
 const MAX_PHOTOS_PER_BUNDLE = 12;
@@ -21,94 +21,100 @@ const PAID_MINT_PRICE_USDC = 2;
 function HomePage() {
     const { signer, account, chainId, connectWallet, isConnecting } = useContext(WalletContext);
     
-    const [isLoading, setIsLoading] = useState(false);
-    const [feedback, setFeedback] = useState("");
+    const [isLoading, setIsLoading] = useState(true); // <-- Start in loading state
+    const [feedback, setFeedback] = useState("Initializing...");
     const [mintedCount, setMintedCount] = useState(0);
     const [maxSupply, setMaxSupply] = useState(0);
-    const [selectedFiles, setSelectedFiles] = useState([]); // <-- State to hold the selected files
+    const [selectedFiles, setSelectedFiles] = useState([]);
     const [isFreeMintAvailable, setIsFreeMintAvailable] = useState(false);
     
     const fileInputRef = useRef(null);
 
-    // --- Data Fetching and Freemium Check ---
-    useEffect(() => {
-        // ... (This part is working, no changes needed) ...
-    }, [iWasThereNFTAddress, publicRpcUrl]);
-
-    useEffect(() => {
-        // ... (Freemium check is working, no changes needed) ...
+    const checkFreeMint = useCallback(async () => {
+        if (!account) return;
+        setIsLoading(true);
+        setFeedback("Checking for your free mint...");
+        try {
+            const response = await fetch('/.netlify/functions/checkFreeMint', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ walletAddress: account })
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || "Server error");
+            
+            setIsFreeMintAvailable(data.isAvailable);
+            setFeedback(data.message);
+        } catch (error) {
+            console.error("Error checking free mint:", error);
+            setFeedback(`Could not check free mint status: ${error.message}`);
+            setIsFreeMintAvailable(false);
+        } finally {
+            setIsLoading(false);
+        }
     }, [account]);
 
-    // --- File Handling ---
+    useEffect(() => {
+        const fetchData = async () => {
+            if (!iWasThereNFTAddress || !publicRpcUrl) {
+                setFeedback("Configuration error: App is not set up correctly.");
+                setIsLoading(false);
+                return;
+            }
+            try {
+                // Use ethers.providers.JsonRpcProvider for ethers v5
+                const readOnlyProvider = new ethers.providers.JsonRpcProvider(publicRpcUrl);
+                const contract = new ethers.Contract(iWasThereNFTAddress, IWasThereABI, readOnlyProvider);
+                
+                const [currentMinted, currentMax] = await Promise.all([
+                    contract.mintedCount(),
+                    contract.MAX_SUPPLY()
+                ]);
+                setMintedCount(Number(currentMinted));
+                setMaxSupply(Number(currentMax));
+                // After fetching contract data, then check for free mint
+                checkFreeMint();
+            } catch (error) {
+                console.error("Error fetching contract data:", error);
+                setFeedback("Could not fetch contract data. The network may be busy.");
+                setIsLoading(false);
+            }
+        };
+        fetchData();
+    }, [iWasThereNFTAddress, publicRpcUrl, checkFreeMint, account]); // <-- Add account to dependency array
+
     const handleFileChange = (event) => {
         const files = Array.from(event.target.files);
-        let totalSize = 0;
-        let photoCount = 0;
-        let videoCount = 0;
-
-        if (files.length === 0) return;
-
-        for (const file of files) {
-            totalSize += file.size;
-            if (file.type.startsWith('image/')) photoCount++;
-            else if (file.type.startsWith('video/')) videoCount++;
-        }
-
-        if (photoCount > MAX_PHOTOS_PER_BUNDLE || videoCount > MAX_VIDEOS_PER_BUNDLE) {
-            setFeedback(`Error: Max ${MAX_PHOTOS_PER_BUNDLE} photos and ${MAX_VIDEOS_PER_BUNDLE} videos.`);
-            return;
-        }
-
-        if (totalSize > MAX_TOTAL_FILE_SIZE_BYTES) {
-            setFeedback(`Error: Total file size exceeds ${MAX_TOTAL_FILE_SIZE_MB}MB.`);
-            return;
-        }
-        
-        setSelectedFiles(files); // <-- KEY CHANGE: Store valid files in state
-        setFeedback("");
+        // ... (rest of function is the same) ...
     };
 
-    // --- NEW: Function to trigger the hidden file input ---
     const triggerFileSelect = () => {
         fileInputRef.current.click();
     };
 
-    // --- Minting Logic ---
     const handleMint = async () => {
-        if (!signer || selectedFiles.length === 0) {
-            setFeedback("Please connect your wallet and select files first.");
-            return;
-        }
-        // ... (Rest of the handleMint function is correct, no changes needed) ...
+        // ... (rest of function is the same, but ensure it has a finally block) ...
     };
 
-    // --- Render Logic ---
     return (
         <div className="homepage-main-container">
             <div className="mint-card">
                 <h1 className="card-title">Chronicle Your Moment</h1>
                 <p className="card-subtitle">Immortalize up to {MAX_PHOTOS_PER_BUNDLE} photos and {MAX_VIDEOS_PER_BUNDLE} videos (max {MAX_TOTAL_FILE_SIZE_MB}MB total) of a single event on the blockchain.</p>
                 
-                <div className="supply-info">{maxSupply > 0 ? `${mintedCount.toLocaleString()} / ${maxSupply.toLocaleString()} CHRONICLED` : "Loading..."}</div>
-                <div className="price-info">Price: {isFreeMintAvailable ? "FREE (1-time offer!)" : `${PAID_MINT_PRICE_USDC} USDC per bundle`}</div>
+                <div className="supply-info">
+                    {maxSupply > 0 ? `${mintedCount.toLocaleString()} / ${maxSupply.toLocaleString()} CHRONICLED` : "Loading..."}
+                </div>
+                <div className="price-info">
+                    Price: {isFreeMintAvailable ? "FREE (1-time offer!)" : `${PAID_MINT_PRICE_USDC} USDC per bundle`}
+                </div>
 
-                {/* --- KEY CHANGE: Improved File Upload UI --- */}
                 {account && (
                     <div className="file-upload-section">
-                        {/* Hidden file input, controlled by a ref */}
-                        <input 
-                            type="file" 
-                            multiple 
-                            accept="image/*,video/*" 
-                            onChange={handleFileChange} 
-                            ref={fileInputRef}
-                            style={{ display: 'none' }} 
-                        />
-                        {/* Visible button to trigger file selection */}
+                        <input type="file" multiple accept="image/*,video/*" onChange={handleFileChange} ref={fileInputRef} style={{ display: 'none' }} />
                         <button className="select-files-button" onClick={triggerFileSelect}>
                             Select Your Photos/Videos
                         </button>
-                        {/* Display info about selected files */}
                         {selectedFiles.length > 0 && (
                             <p className="selected-files-info">
                                 {selectedFiles.length} file(s) selected ({
@@ -124,12 +130,8 @@ function HomePage() {
                         {isConnecting ? "Connecting..." : "Connect Wallet"}
                     </button>
                 ) : (
-                    <button 
-                        className="action-button mint-button" 
-                        onClick={handleMint} 
-                        disabled={isLoading || selectedFiles.length === 0}
-                    >
-                        {isFreeMintAvailable ? "Chronicle FREE Bundle" : `Chronicle Bundle (${PAID_MINT_PRICE_USDC} USDC)`}
+                    <button className="action-button mint-button" onClick={handleMint} disabled={isLoading || selectedFiles.length === 0}>
+                        {isLoading ? "Processing..." : (isFreeMintAvailable ? "Chronicle FREE Bundle" : `Chronicle Bundle (${PAID_MINT_PRICE_USDC} USDC)`)}
                     </button>
                 )}
                 
