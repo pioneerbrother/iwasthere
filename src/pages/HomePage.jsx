@@ -171,6 +171,17 @@ function HomePage() {
         });
         
         console.log("Backend response received with status:", processMintResponse.status);
+        if (!processMintResponse.ok) {
+    const errorText = await processMintResponse.text(); // Get response as text
+    console.error("Backend function returned an error:", errorText);
+    // Try to parse as JSON, but fall back to the raw text if it fails
+    try {
+        const errorJson = JSON.parse(errorText);
+        throw new Error(errorJson.error || "Minting process failed on the backend.");
+    } catch (e) {
+        throw new Error(errorText || "Minting process failed on the backend.");
+    }
+}
         const processMintResult = await processMintResponse.json();
 
         if (!processMintResponse.ok) {

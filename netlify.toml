@@ -3,13 +3,15 @@
   command = "npm run build"
   functions = "netlify/functions"
 
-# --- ADD THIS ENTIRE BLOCK ---
 [functions]
   node_bundler = "esbuild"
-  # This tells Netlify to treat .mjs files as first-class functions
-  included_files = ["!node_modules/ethers/dist/ethers.umd.js"]
+
+# --- ADD THIS BLOCK ---
+# Increase the timeout for the processMint function specifically
+[functions."processMint"]
+  timeout = 30 # Timeout in seconds
 
 [[redirects]]
   from = "/*"
-  to = "/index.html"
+  to = "index.html"
   status = 200
