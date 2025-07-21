@@ -3,7 +3,6 @@ import FormData from 'form-data';
 import { ethers } from 'ethers';
 import { getStore } from "@netlify/blobs";
 
-// Environment variables are automatically loaded by Netlify
 const PINATA_API_KEY = process.env.PINATA_API_KEY;
 const PINATA_SECRET_API_KEY = process.env.PINATA_SECRET_API_KEY;
 const OWNER_PRIVATE_KEY_FOR_FREE_MINTS = process.env.OWNER_PRIVATE_KEY_FOR_FREE_MINTS;
@@ -12,14 +11,12 @@ const POLYGON_RPC_URL = process.env.POLYGON_RPC_URL;
 
 const PINATA_BASE_URL = 'https://api.pinata.cloud/';
 
-// Minimal ABI needed for the relayer to call the mintFree function
 const IWAS_THERE_ABI_MINIMAL = [
     "function mintFree(address to, string memory _tokenURI)"
 ];
 
 export const handler = async function(event, context) {
     console.log("--- processMint function invoked ---");
-
     try {
         if (event.httpMethod !== 'POST') {
             return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
@@ -35,7 +32,11 @@ export const handler = async function(event, context) {
 
         console.log("Step 1: Verifying wallet signature...");
         const message = `ChronicleMe: Verifying access for ${walletAddress} to upload media and request mint.`;
-        const recoveredAddress = ethers.utils.verifyMessage(message, signature);
+        
+        // --- THIS IS THE KEY FIX ---
+        // Use ethers.verifyMessage() for Ethers v6
+        const recoveredAddress = ethers.verifyMessage(message, signature);
+
         if (recoveredAddress.toLowerCase() !== walletAddress.toLowerCase()) {
             throw new Error("Invalid wallet signature. Unauthorized.");
         }
