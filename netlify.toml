@@ -3,9 +3,8 @@
   command = "npm run build"
   functions = "netlify/functions"
 
-# This block is for .js files and applies the timeout
 [functions."processMint.js"]
-  timeout = 120 # Timeout in seconds
+  timeout = 120
 
 [[redirects]]
   from = "/*"
