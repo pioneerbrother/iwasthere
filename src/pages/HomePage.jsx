@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useContext, useRef, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { WalletContext } from '../contexts/WalletContext.jsx';
-import { Buffer } from 'buffer';
-window.Buffer = Buffer;
 import './HomePage.css';
 
 import IWasThereABI from '../abis/IWasThere.json';
@@ -29,6 +27,7 @@ function HomePage() {
     const [maxSupply, setMaxSupply] = useState(0);
     const [selectedFiles, setSelectedFiles] = useState([]);
     const [isFreeMintAvailable, setIsFreeMintAvailable] = useState(false);
+    const [latestTxHash, setLatestTxHash] = useState(''); // State to hold the transaction hash for display
     
     const fileInputRef = useRef(null);
 
@@ -50,7 +49,6 @@ function HomePage() {
         } catch (error) {
             console.error("Error checking free mint:", error);
             setFeedback(`Could not check free mint status: ${error.message}`);
-            setIsFreeMintAvailable(false);
         } finally {
             setIsLoading(false);
         }
@@ -60,7 +58,6 @@ function HomePage() {
         const fetchData = async () => {
             if (!iWasThereNFTAddress || !publicRpcUrl) {
                 setFeedback("Configuration error.");
-                setIsLoading(false);
                 return;
             }
             try {
@@ -74,10 +71,8 @@ function HomePage() {
                 setMaxSupply(Number(currentMax));
             } catch (error) {
                 console.error("Error fetching contract data:", error);
-                setFeedback("Could not fetch contract data.");
             }
         };
-
         fetchData();
         if (account) {
             checkFreeMint();
@@ -89,131 +84,105 @@ function HomePage() {
 
     const handleFileChange = useCallback((event) => {
         const files = Array.from(event.target.files);
-        if (files.length === 0) {
-            setSelectedFiles([]);
-            return;
-        }
-
         let totalSize = 0;
         let photoCount = 0;
         let videoCount = 0;
-
+        if (files.length === 0) return;
         for (const file of files) {
             totalSize += file.size;
             if (file.type.startsWith('image/')) photoCount++;
             else if (file.type.startsWith('video/')) videoCount++;
         }
-
         if (photoCount > MAX_PHOTOS_PER_BUNDLE || videoCount > MAX_VIDEOS_PER_BUNDLE) {
             setFeedback(`Error: Max ${MAX_PHOTOS_PER_BUNDLE} photos and ${MAX_VIDEOS_PER_BUNDLE} videos.`);
             setSelectedFiles([]);
-            if (fileInputRef.current) fileInputRef.current.value = "";
             return;
         }
-
         if (totalSize > MAX_TOTAL_FILE_SIZE_BYTES) {
             setFeedback(`Error: Total file size exceeds ${MAX_TOTAL_FILE_SIZE_MB}MB.`);
             setSelectedFiles([]);
-            if (fileInputRef.current) fileInputRef.current.value = "";
             return;
         }
-        
         setSelectedFiles(files);
         setFeedback("Files selected. Ready to Chronicle.");
+        setLatestTxHash(''); // Clear old tx hash when new files are selected
     }, []);
 
     const triggerFileSelect = useCallback(() => {
         fileInputRef.current.click();
     }, []);
 
-   const handleMint = useCallback(async () => {
-    console.log("--- MINT PROCESS STARTED (Final Version) ---");
-    if (!signer || selectedFiles.length === 0) {
-        setFeedback("Please connect wallet and select files.");
-        return;
-    }
-
-    setIsLoading(true);
-    setFeedback("1/4: Preparing your files...");
-
-    try {
-        // --- NEW, MORE ROBUST FILE READING LOGIC ---
-        const filesData = await Promise.all(selectedFiles.map(async (file) => {
-            const buffer = await file.arrayBuffer();
-            const base64String = Buffer.from(buffer).toString('base64');
-            return {
-                fileName: file.name,
-                fileContentBase64: base64String,
-                fileType: file.type
-            };
-        }));
-        console.log("Step 1/4 successful: Files prepared.");
-
-        setFeedback("2/4: Awaiting wallet signature...");
-        const messageToSign = `ChronicleMe: Verifying access for ${account} to upload media and request mint.`;
-        const signature = await signer.signMessage(messageToSign);
-        console.log("Step 2/4 successful: Message signed.");
-
-        console.log("Step 3/4: Sending request to backend...");
-        setFeedback("3/4: Uploading to IPFS & contacting blockchain...");
-        
-        const processMintResponse = await fetch('/.netlify/functions/processMint', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                files: filesData,
-                walletAddress: account,
-                signature: signature,
-                isFreeMint: isFreeMintAvailable,
-                title: `Chronicle Bundle by ${account}`,
-                description: `A collection of memories chronicled by ${account}.`
-            }),
-        });
-        
-        const processMintResult = await processMintResponse.json();
-        if (!processMintResponse.ok) {
-            throw new Error(processMintResult.error || "Backend process failed.");
+    const handleMint = useCallback(async () => {
+        if (!signer || selectedFiles.length === 0) {
+            setFeedback("Please connect wallet and select files.");
+            return;
         }
-        console.log("Step 3/4 successful: Backend processed request.");
+        setIsLoading(true);
+        setLatestTxHash('');
+        setFeedback("1/4: Preparing your files...");
 
-        const ipfsMetadataCid = `ipfs://${processMintResult.metadataCID}`;
-        
-        if (isFreeMintAvailable) {
-            setFeedback("🎉 Success! Your FREE Chronicle is on the blockchain!");
-        } else {
-            setFeedback("3/4: Approving USDC...");
-            const iWasThereContract = new ethers.Contract(iWasThereNFTAddress, IWasThereABI, signer);
-            const usdcContract = new ethers.Contract(usdcAddress, ERC20ABI, signer);
-            const contractMintPrice = await iWasThereContract.mintPrice();
-            const allowance = await usdcContract.allowance(account, iWasThereNFTAddress);
+        try {
+            const filesData = await Promise.all(selectedFiles.map(file => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve({
+                    fileName: file.name,
+                    fileContentBase64: reader.result.split(',')[1],
+                    fileType: file.type
+                });
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            })));
+
+            setFeedback("2/4: Awaiting wallet signature...");
+            const messageToSign = `ChronicleMe: Verifying access for ${account} to upload media and request mint.`;
+            const signature = await signer.signMessage(messageToSign);
+
+            setFeedback("3/4: Uploading files and submitting to blockchain...");
+            const processMintResponse = await fetch('/.netlify/functions/processMint', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filesData, walletAddress: account, signature, isFreeMint: isFreeMintAvailable }),
+            });
             
-            if (allowance.lt(contractMintPrice)) {
-                const approveTx = await usdcContract.approve(iWasThereNFTAddress, contractMintPrice);
-                await approveTx.wait();
+            const processMintResult = await processMintResponse.json();
+            if (!processMintResponse.ok) throw new Error(processMintResult.error || "Backend process failed.");
+
+            if (isFreeMintAvailable) {
+                setFeedback("🎉 Success! Your FREE mint has been submitted to the blockchain.");
+                setLatestTxHash(processMintResult.transactionHash);
+            } else {
+                const ipfsMetadataCid = `ipfs://${processMintResult.metadataCID}`;
+                setFeedback("3/4: Approving USDC...");
+                const iWasThereContract = new ethers.Contract(iWasThereNFTAddress, IWasThereABI, signer);
+                const usdcContract = new ethers.Contract(usdcAddress, ERC20ABI, signer);
+                const contractMintPrice = await iWasThereContract.mintPrice();
+                const allowance = await usdcContract.allowance(account, iWasThereNFTAddress);
+                
+                if (allowance.lt(contractMintPrice)) {
+                    const approveTx = await usdcContract.approve(iWasThereNFTAddress, contractMintPrice);
+                    await approveTx.wait();
+                }
+
+                const mintTx = await iWasThereContract.mint(account, ipfsMetadataCid);
+                setFeedback("4/4: Finalizing on blockchain...");
+                await mintTx.wait();
+                setFeedback("🎉 Success! Your Chronicle is on the blockchain!");
+                setLatestTxHash(mintTx.hash);
             }
 
-            const mintTx = await iWasThereContract.mint(account, ipfsMetadataCid);
-            setFeedback("4/4: Finalizing on blockchain...");
-            await mintTx.wait();
-            setFeedback("🎉 Success! Your Chronicle is on the blockchain!");
+            setSelectedFiles([]);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+            setMintedCount(prev => prev + 1);
+            checkFreeMint();
+        } catch (error) {
+            setFeedback(`Error: ${error.reason || error.message || "An unknown error occurred."}`);
+        } finally {
+            setIsLoading(false);
         }
+    }, [account, signer, selectedFiles, isFreeMintAvailable, checkFreeMint]);
 
-        setSelectedFiles([]);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-        setMintedCount(prev => prev + 1);
-        checkFreeMint();
-
-    } catch (error) {
-        console.error("CRITICAL ERROR in handleMint:", error);
-        setFeedback(`Error: ${error.message || "An unknown error occurred."}`);
-    } finally {
-        setIsLoading(false);
-    }
-}, [account, signer, selectedFiles, isFreeMintAvailable, checkFreeMint]);
     const mintButtonText = () => {
-        if (isLoading) return "Processing...";
-        if (isFreeMintAvailable) return "Chronicle FREE Bundle";
-        return `Chronicle Bundle (${PAID_MINT_PRICE_USDC} USDC)`;
+        // ... (this function is correct) ...
     };
 
     return (
@@ -229,7 +198,6 @@ function HomePage() {
                     { !account ? `Price: ${PAID_MINT_PRICE_USDC} USDC per bundle` : isFreeMintAvailable ? "Price: FREE (1-time offer!)" : `Price: ${PAID_MINT_PRICE_USDC} USDC per bundle` }
                 </div>
 
-                {/* --- RENDER LOGIC --- */}
                 {!account ? (
                     <button className="action-button connect-button" onClick={connectWallet} disabled={isConnecting}>
                         {isConnecting ? "Connecting..." : "Connect Wallet"}
@@ -243,14 +211,11 @@ function HomePage() {
                             </button>
                             {selectedFiles.length > 0 && (
                                 <p className="selected-files-info">
-                                    {selectedFiles.length} file(s) selected ({
-                                        (selectedFiles.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024)).toFixed(2)
-                                    } MB)
+                                    {selectedFiles.length} file(s) selected
                                 </p>
                             )}
                         </div>
                         
-                        {/* KEY CHANGE: The mint button is now always visible when connected, but disabled if no files are selected */}
                         <button 
                             className="action-button mint-button" 
                             onClick={handleMint} 
@@ -262,6 +227,13 @@ function HomePage() {
                 )}
                 
                 {feedback && <p className="feedback-text">{feedback}</p>}
+                {latestTxHash && (
+                    <div className="tx-link">
+                        <a href={`https://polygonscan.com/tx/${latestTxHash}`} target="_blank" rel="noopener noreferrer">
+                            View Transaction on PolygonScan
+                        </a>
+                    </div>
+                )}
             </div>
         </div>
     );

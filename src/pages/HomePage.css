@@ -163,4 +163,15 @@
 .select-files-button:hover {
     background-color: #0056b3;
 }
+.tx-link {
+    margin-top: 20px;
+    font-size: 0.9rem;
+}
+.tx-link a {
+    color: #007bff;
+    text-decoration: none;
+    font-weight: bold;
+}
+.tx-link a:hover {
+    text-decoration: underline;
 }
