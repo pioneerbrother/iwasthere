@@ -1,4 +1,4 @@
-const { getStore } = require("@netlify/blobs");
+import { getStore } from "@netlify/blobs";
 
 export const handler = async function(event, context) {
     if (event.httpMethod !== 'POST') {

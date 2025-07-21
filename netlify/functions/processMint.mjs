@@ -1,7 +1,7 @@
-const fetch = require('node-fetch');
-const FormData = require('form-data');
-const { ethers } = require('ethers');
-const { getStore } = require("@netlify/blobs");
+import fetch from 'node-fetch';
+import FormData from 'form-data';
+import { ethers } from 'ethers';
+import { getStore } from "@netlify/blobs";
 
 const PINATA_JWT = process.env.PINATA_JWT;
 const OWNER_PRIVATE_KEY_FOR_FREE_MINTS = process.env.OWNER_PRIVATE_KEY_FOR_FREE_MINTS;
