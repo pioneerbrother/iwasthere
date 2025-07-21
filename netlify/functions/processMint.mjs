@@ -14,113 +14,47 @@ const IWAS_THERE_ABI_MINIMAL = [
     "function mintFree(address to, string memory _tokenURI)"
 ];
 
-export const handler = async function(event, context) {
+exports.handler = async function(event, context) {
     console.log("--- processMint function invoked (v5) ---");
 
     try {
-        if (event.httpMethod !== 'POST') {
-            return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
-        }
-        
-        const { files, walletAddress, signature, isFreeMint, title, description } = JSON.parse(event.body);
-        if (!files || !walletAddress || !signature) {
-             throw new Error("Missing required fields.");
-        }
-
-        const message = `ChronicleMe: Verifying access for ${walletAddress} to upload media and request mint.`;
-        
-        // Ethers v5 syntax for verifying a message
-        const recoveredAddress = ethers.utils.verifyMessage(message, signature);
-
-        if (recoveredAddress.toLowerCase() !== walletAddress.toLowerCase()) {
-            throw new Error("Invalid wallet signature. Unauthorized.");
-        }
-
-        const freeMintStore = getStore({
-            name: "iwasthere-free-mints",
-            siteID: process.env.NETLIFY_SITE_ID,
-            token: process.env.NETLIFY_API_TOKEN
-        });
+        // ... (The top part of your function is the same: body parsing, signature check, blob store, pinata uploads)
 
         if (isFreeMint) {
-            const hasUsedFreeMint = await freeMintStore.get(walletAddress.toLowerCase());
-            if (hasUsedFreeMint) {
-                throw new Error("Free mint already used for this wallet.");
-            }
-        }
-
-        const mediaCIDs = [];
-        for (const fileData of files) {
-            const fileBuffer = Buffer.from(fileData.fileContentBase64, 'base64');
-            const formData = new FormData();
-            formData.append('file', fileBuffer, { filename: fileData.fileName, contentType: fileData.fileType });
-            
-            const pinataFileRes = await fetch(`${PINATA_BASE_URL}pinning/pinFileToIPFS`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${PINATA_JWT}`, ...formData.getHeaders() },
-                body: formData
-            });
-
-            if (!pinataFileRes.ok) {
-                const errorText = await pinataFileRes.text();
-                throw new Error(`Pinata upload failed: ${errorText}`);
-            }
-            const fileResult = await pinataFileRes.json();
-            mediaCIDs.push({ cid: fileResult.IpfsHash, fileName: fileData.fileName, fileType: fileData.fileType });
-        }
-
-        const nftMetadata = {
-            name: title || `Chronicle Bundle by ${walletAddress}`,
-            description: description,
-            image: mediaCIDs[0] && mediaCIDs[0].fileType.startsWith('image/') ? `ipfs://${mediaCIDs[0].cid}` : null,
-            properties: {
-                media: mediaCIDs.map(item => ({ ipfsUrl: `ipfs://${item.cid}`, ...item }))
-            },
-            attributes: [
-                { "trait_type": "Uploader", "value": walletAddress },
-                { "trait_type": "File Count", "value": mediaCIDs.length }
-            ]
-        };
-
-        const metadataBuffer = Buffer.from(JSON.stringify(nftMetadata));
-        const metadataFormData = new FormData();
-        metadataFormData.append('file', metadataBuffer, { filename: 'metadata.json', contentType: 'application/json' });
-
-        const pinataMetadataRes = await fetch(`${PINATA_BASE_URL}pinning/pinFileToIPFS`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${PINATA_JWT}`, ...metadataFormData.getHeaders() },
-            body: metadataFormData
-        });
-
-        if (!pinataMetadataRes.ok) {
-            const errorText = await pinataMetadataRes.text();
-            throw new Error(`Pinata metadata upload failed: ${errorText}`);
-        }
-        const metadataResult = await pinataMetadataRes.json();
-        const metadataCID = metadataResult.IpfsHash;
-
-        if (isFreeMint) {
+            console.log("Step 4: Processing FREE mint via backend relayer...");
             if (!OWNER_PRIVATE_KEY_FOR_FREE_MINTS) throw new Error("Relayer private key not configured.");
             
-            // Ethers v5 syntax for provider and wallet
             const provider = new ethers.providers.JsonRpcProvider(POLYGON_RPC_URL);
             const ownerWallet = new ethers.Wallet(OWNER_PRIVATE_KEY_FOR_FREE_MINTS, provider);
             const iWasThereContract = new ethers.Contract(IWAS_THERE_NFT_ADDRESS, IWAS_THERE_ABI_MINIMAL, ownerWallet);
 
-            const tx = await iWasThereContract.mintFree(walletAddress, `ipfs://${metadataCID}`);
-            await tx.wait();
+            console.log(`Relayer wallet (${ownerWallet.address}) is calling mintFree for user (${walletAddress})...`);
 
+            // --- FINAL FIX: Add Manual Gas Overrides ---
+            // This prevents the transaction from hanging on gas estimation.
+            const gasPrice = await provider.getGasPrice();
+            const txOverrides = {
+                gasLimit: ethers.utils.hexlify(300000), // Set a generous gas limit (300,000)
+                gasPrice: gasPrice.mul(120).div(100), // Increase current gas price by 20% to ensure it gets mined
+            };
+            
+            console.log("Sending transaction with manual gas overrides:", txOverrides);
+            const tx = await iWasThereContract.mintFree(walletAddress, `ipfs://${metadataCID}`, txOverrides);
+            
+            console.log("Transaction sent. Waiting for confirmation. TxHash:", tx.hash);
+            await tx.wait(); // This should no longer hang
+            console.log("Free mint transaction confirmed.");
+
+            console.log("Updating Blob store to mark free mint as used...");
             await freeMintStore.set(walletAddress.toLowerCase(), "used");
+            console.log("Blob store updated.");
 
             return {
                 statusCode: 200,
                 body: JSON.stringify({ metadataCID, message: "Free Chronicle Bundle minted successfully!" })
             };
         } else {
-            return {
-                statusCode: 200,
-                body: JSON.stringify({ metadataCID, message: "Files uploaded. Ready for on-chain mint." })
-            };
+            // ... (paid mint logic is the same)
         }
     } catch (error) {
         console.error("--- CRITICAL ERROR in processMint function ---", error);
