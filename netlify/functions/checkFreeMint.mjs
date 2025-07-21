@@ -13,7 +13,11 @@ exports.handler = async function(event, context) {
         }
 
         // Get your Blob store. The name must match what you configured in Netlify UI
-        const freeMintStore = getStore("iwasthere-free-mints"); 
+       const freeMintStore = getStore({
+    name: "iwasthere-free-mints",
+    siteID: process.env.NETLIFY_SITE_ID,
+    token: process.env.NETLIFY_API_TOKEN
+});
         const hasUsedFreeMint = await freeMintStore.get(walletAddress.toLowerCase());
 
         const isAvailable = hasUsedFreeMint ? false : true;
