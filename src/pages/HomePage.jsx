@@ -156,11 +156,13 @@ function HomePage() {
             console.log("Step 2/4 successful: Message signed.");
 
             setFeedback("3/4: Uploading to IPFS & contacting blockchain...");
-            const processMintResponse = await fetch('/.netlify/functions/processMint', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ files, walletAddress: account, signature, isFreeMint: isFreeMintAvailable }),
-            });
+          const processMintResponse = await fetch('/.netlify/functions/processMint', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    // V-- Change is here
+    body: JSON.stringify({ files: filesData, walletAddress: account, signature, isFreeMint: isFreeMintAvailable }),
+});
+
             
             const processMintResult = await processMintResponse.json();
             if (!processMintResponse.ok) {
