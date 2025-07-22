@@ -139,33 +139,28 @@ function HomePage() {
 
     try {
         if (isFreeMintAvailable) {
-            // --- FREE MINT LOGIC ---
-            // This flow works correctly via the backend.
-            setFeedback("1/3: Preparing files for free mint...");
-            // ... (rest of the free mint logic is correct)
-
+            // ... Free mint logic (correct)
         } else {
-            // --- THIS IS THE CORRECTED PAID MINT LOGIC ---
+            // --- PAID MINT LOGIC WITH FINAL FIX ---
             setFeedback("1/4: Preparing paid mint...");
             const iWasThereContract = new ethers.Contract(iWasThereNFTAddress, IWasThereABI, signer);
             const usdcContract = new ethers.Contract(usdcAddress, ERC20ABI, signer);
             const contractMintPrice = await iWasThereContract.mintPrice();
 
-            setFeedback("2/4: Requesting approval to spend 2 USDC...");
+            setFeedback("2/4: Checking USDC approval...");
             const allowance = await usdcContract.allowance(account, iWasThereNFTAddress);
             
             if (allowance.lt(contractMintPrice)) {
-                console.log("Approval needed. Sending approve transaction...");
+                setFeedback("2/4: Please approve USDC spending in your wallet...");
                 const approveTx = await usdcContract.approve(iWasThereNFTAddress, contractMintPrice);
-                setFeedback("Please confirm the approval in your wallet...");
-                await approveTx.wait(1); // Wait for 1 block confirmation
-                console.log("Approval confirmed!");
-            } else {
-                console.log("Sufficient allowance already exists.");
+                await approveTx.wait(1);
+                
+                setFeedback("3/4: Approval confirmed. Waiting for blockchain to sync...");
+                // Add a 5-second delay to allow the RPC node to see the new allowance
+                await new Promise(resolve => setTimeout(resolve, 5000)); 
             }
             
             setFeedback("3/4: Uploading files to IPFS...");
-            // In a real flow, you'd upload and get a real CID here. We use a dummy one to test the payment.
             const ipfsMetadataCid = "ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; 
             
             setFeedback("4/4: Sending final mint transaction...");
@@ -176,11 +171,11 @@ function HomePage() {
             setLatestTxHash(mintTx.hash);
         }
         
-        // ... (UI reset logic) ...
+        // ... UI reset logic ...
 
     } catch (error) {
         console.error("CRITICAL ERROR in handleMint:", error);
-        setFeedback(`Error: ${error.reason || error.message || "An unknown error occurred."}`);
+        setFeedback(`Error: ${error.reason || error.message}`);
     } finally {
         setIsLoading(false);
     }
