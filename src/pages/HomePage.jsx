@@ -150,14 +150,15 @@ function HomePage() {
                 setFeedback("2/4: Preparing paid transaction...");
                 const iWasThereContract = new ethers.Contract(iWasThereNFTAddress, IWasThereABI, signer);
                 const usdcContract = new ethers.Contract(usdcAddress, ERC20ABI, signer);
-                const contractMintPrice = await iWasThereContract.mintPrice();
+               
 
                 setFeedback("3/4: Please approve USDC spending in your wallet...");
                 const allowance = await usdcContract.allowance(account, iWasThereNFTAddress);
                 
                 if (allowance.lt(contractMintPrice)) {
                     console.log("Allowance is insufficient. Sending approve transaction...");
-                    const approveTx = await usdcContract.approve(iWasThereNFTAddress, contractMintPrice);
+                   const mintPriceInSmallestUnit = ethers.BigNumber.from("2000000"); // 2 * 10^6
+const approveTx = await usdcContract.approve(iWasThereContract.address, mintPriceInSmallestUnit);
                     await approveTx.wait(1); // Wait for 1 block confirmation
                     console.log("Approval confirmed!");
                 } else {
