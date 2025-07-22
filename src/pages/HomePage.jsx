@@ -16,7 +16,7 @@ const POLYGON_MAINNET_CHAIN_ID = 137;
 
 const MAX_PHOTOS_PER_BUNDLE = 12;
 const MAX_VIDEOS_PER_BUNDLE = 2;
-const MAX_TOTAL_FILE_SIZE_MB = 25;
+const MAX_TOTAL_FILE_SIZE_MB = 75;
 const MAX_TOTAL_FILE_SIZE_BYTES = MAX_TOTAL_FILE_SIZE_MB * 1024 * 1024;
 const PAID_MINT_PRICE_USDC = 2;
 
@@ -239,11 +239,19 @@ function HomePage() {
                             <button className="select-files-button" onClick={triggerFileSelect}>
                                 Select Your Photos/Videos
                             </button>
-                            {selectedFiles.length > 0 && (
-                                <p className="selected-files-info">
-                                    {selectedFiles.length} file(s) selected
-                                </p>
-                            )}
+                        {selectedFiles.length > 0 && (
+    <div className="selected-files-details">
+        <p>
+            {selectedFiles.length} file(s) selected
+        </p>
+        <p className="size-tracker">
+            Total Size: 
+            <strong>
+                {(selectedFiles.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024)).toFixed(2)} MB / {MAX_TOTAL_FILE_SIZE_MB} MB
+            </strong>
+        </p>
+    </div>
+)}
                         </div>
                         
                         <button 

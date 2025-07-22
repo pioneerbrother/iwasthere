@@ -175,3 +175,22 @@
 .tx-link a:hover {
     text-decoration: underline;
 }
+.selected-files-details {
+    font-size: 0.9rem;
+    color: #333;
+    text-align: center;
+    margin-top: 10px;
+}
+
+.selected-files-details p {
+    margin: 4px 0; /* Add a little space between the lines */
+}
+
+.size-tracker {
+    font-weight: 500;
+}
+
+.size-tracker strong {
+    color: #007bff; /* Make the size number stand out */
+    font-weight: bold;
+}
