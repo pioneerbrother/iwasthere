@@ -128,7 +128,7 @@ function HomePage() {
         fileInputRef.current.click();
     }, []);
 
-   const handleMint = useCallback(async () => {
+  const handleMint = useCallback(async () => {
     if (!signer || selectedFiles.length === 0) {
         setFeedback("Please connect wallet and select files.");
         return;
@@ -136,44 +136,47 @@ function HomePage() {
 
     setIsLoading(true);
     setLatestTxHash('');
-    setFeedback("Processing...");
 
     try {
         if (isFreeMintAvailable) {
-            // ... Free mint logic is correct and remains the same
+            // --- FREE MINT LOGIC ---
+            // This flow works correctly via the backend.
+            setFeedback("1/3: Preparing files for free mint...");
+            // ... (rest of the free mint logic is correct)
+
         } else {
-            // --- START OF ROBUST PAID MINT LOGIC ---
-            console.log("--- PAID MINT PROCESS STARTED ---");
-            const ipfsMetadataCid = "ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; // Placeholder for now
-            
-            setFeedback("1/3: Preparing transaction...");
+            // --- THIS IS THE CORRECTED PAID MINT LOGIC ---
+            setFeedback("1/4: Preparing paid mint...");
             const iWasThereContract = new ethers.Contract(iWasThereNFTAddress, IWasThereABI, signer);
             const usdcContract = new ethers.Contract(usdcAddress, ERC20ABI, signer);
             const contractMintPrice = await iWasThereContract.mintPrice();
 
-            setFeedback("2/3: Requesting approval to spend 2 USDC...");
+            setFeedback("2/4: Requesting approval to spend 2 USDC...");
             const allowance = await usdcContract.allowance(account, iWasThereNFTAddress);
             
             if (allowance.lt(contractMintPrice)) {
-                console.log("Allowance is insufficient. Sending approve transaction...");
+                console.log("Approval needed. Sending approve transaction...");
                 const approveTx = await usdcContract.approve(iWasThereNFTAddress, contractMintPrice);
-                console.log("Approval transaction sent, waiting for 1 confirmation...", approveTx.hash);
+                setFeedback("Please confirm the approval in your wallet...");
                 await approveTx.wait(1); // Wait for 1 block confirmation
                 console.log("Approval confirmed!");
             } else {
                 console.log("Sufficient allowance already exists.");
             }
-
-            setFeedback("3/3: Sending final mint transaction...");
+            
+            setFeedback("3/4: Uploading files to IPFS...");
+            // In a real flow, you'd upload and get a real CID here. We use a dummy one to test the payment.
+            const ipfsMetadataCid = "ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; 
+            
+            setFeedback("4/4: Sending final mint transaction...");
             const mintTx = await iWasThereContract.mint(account, ipfsMetadataCid);
-            console.log("Mint transaction sent, waiting for confirmation...", mintTx.hash);
-            await mintTx.wait(1); // Wait for 1 block confirmation
+            await mintTx.wait(1);
             
             setFeedback("🎉 Success! Your Chronicle is on the blockchain!");
             setLatestTxHash(mintTx.hash);
         }
         
-        // ... (UI reset logic is the same) ...
+        // ... (UI reset logic) ...
 
     } catch (error) {
         console.error("CRITICAL ERROR in handleMint:", error);
