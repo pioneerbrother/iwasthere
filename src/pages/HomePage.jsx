@@ -1,3 +1,5 @@
+import { Buffer } from 'buffer';
+window.Buffer = Buffer; // Polyfill for browser environment
 import React, { useState, useEffect, useContext, useRef, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { WalletContext } from '../contexts/WalletContext.jsx';
@@ -27,7 +29,7 @@ function HomePage() {
     const [maxSupply, setMaxSupply] = useState(0);
     const [selectedFiles, setSelectedFiles] = useState([]);
     const [isFreeMintAvailable, setIsFreeMintAvailable] = useState(false);
-    const [latestTxHash, setLatestTxHash] = useState(''); // State to hold the transaction hash for display
+    const [latestTxHash, setLatestTxHash] = useState('');
     
     const fileInputRef = useRef(null);
 
@@ -49,6 +51,7 @@ function HomePage() {
         } catch (error) {
             console.error("Error checking free mint:", error);
             setFeedback(`Could not check free mint status: ${error.message}`);
+            setIsFreeMintAvailable(false);
         } finally {
             setIsLoading(false);
         }
@@ -58,6 +61,7 @@ function HomePage() {
         const fetchData = async () => {
             if (!iWasThereNFTAddress || !publicRpcUrl) {
                 setFeedback("Configuration error.");
+                setIsLoading(false);
                 return;
             }
             try {
@@ -71,8 +75,10 @@ function HomePage() {
                 setMaxSupply(Number(currentMax));
             } catch (error) {
                 console.error("Error fetching contract data:", error);
+                setFeedback("Could not fetch contract data.");
             }
         };
+
         fetchData();
         if (account) {
             checkFreeMint();
@@ -84,28 +90,38 @@ function HomePage() {
 
     const handleFileChange = useCallback((event) => {
         const files = Array.from(event.target.files);
+        if (files.length === 0) {
+            setSelectedFiles([]);
+            return;
+        }
+
         let totalSize = 0;
         let photoCount = 0;
         let videoCount = 0;
-        if (files.length === 0) return;
+
         for (const file of files) {
             totalSize += file.size;
             if (file.type.startsWith('image/')) photoCount++;
             else if (file.type.startsWith('video/')) videoCount++;
         }
+
         if (photoCount > MAX_PHOTOS_PER_BUNDLE || videoCount > MAX_VIDEOS_PER_BUNDLE) {
             setFeedback(`Error: Max ${MAX_PHOTOS_PER_BUNDLE} photos and ${MAX_VIDEOS_PER_BUNDLE} videos.`);
             setSelectedFiles([]);
+            if (fileInputRef.current) fileInputRef.current.value = "";
             return;
         }
+
         if (totalSize > MAX_TOTAL_FILE_SIZE_BYTES) {
             setFeedback(`Error: Total file size exceeds ${MAX_TOTAL_FILE_SIZE_MB}MB.`);
             setSelectedFiles([]);
+            if (fileInputRef.current) fileInputRef.current.value = "";
             return;
         }
+        
         setSelectedFiles(files);
         setFeedback("Files selected. Ready to Chronicle.");
-        setLatestTxHash(''); // Clear old tx hash when new files are selected
+        setLatestTxHash('');
     }, []);
 
     const triggerFileSelect = useCallback(() => {
@@ -117,35 +133,40 @@ function HomePage() {
             setFeedback("Please connect wallet and select files.");
             return;
         }
+
         setIsLoading(true);
         setLatestTxHash('');
         setFeedback("1/4: Preparing your files...");
 
         try {
-            const filesData = await Promise.all(selectedFiles.map(file => new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve({
+            const filesData = await Promise.all(selectedFiles.map(async (file) => {
+                const buffer = await file.arrayBuffer();
+                const base64String = Buffer.from(buffer).toString('base64');
+                return {
                     fileName: file.name,
-                    fileContentBase64: reader.result.split(',')[1],
+                    fileContentBase64: base64String,
                     fileType: file.type
-                });
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            })));
+                };
+            }));
+            console.log("Step 1/4 successful: Files prepared.");
 
             setFeedback("2/4: Awaiting wallet signature...");
             const messageToSign = `ChronicleMe: Verifying access for ${account} to upload media and request mint.`;
             const signature = await signer.signMessage(messageToSign);
+            console.log("Step 2/4 successful: Message signed.");
 
-            setFeedback("3/4: Uploading files and submitting to blockchain...");
+            setFeedback("3/4: Uploading to IPFS & contacting blockchain...");
             const processMintResponse = await fetch('/.netlify/functions/processMint', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filesData, walletAddress: account, signature, isFreeMint: isFreeMintAvailable }),
+                body: JSON.stringify({ files, walletAddress: account, signature, isFreeMint: isFreeMintAvailable }),
             });
             
             const processMintResult = await processMintResponse.json();
-            if (!processMintResponse.ok) throw new Error(processMintResult.error || "Backend process failed.");
+            if (!processMintResponse.ok) {
+                throw new Error(processMintResult.error || "Backend process failed.");
+            }
+            console.log("Step 3/4 successful: Backend processed request.");
 
             if (isFreeMintAvailable) {
                 setFeedback("🎉 Success! Your FREE mint has been submitted to the blockchain.");
@@ -175,6 +196,7 @@ function HomePage() {
             setMintedCount(prev => prev + 1);
             checkFreeMint();
         } catch (error) {
+            console.error("CRITICAL ERROR in handleMint:", error);
             setFeedback(`Error: ${error.reason || error.message || "An unknown error occurred."}`);
         } finally {
             setIsLoading(false);
@@ -182,7 +204,9 @@ function HomePage() {
     }, [account, signer, selectedFiles, isFreeMintAvailable, checkFreeMint]);
 
     const mintButtonText = () => {
-        // ... (this function is correct) ...
+        if (isLoading) return "Processing...";
+        if (isFreeMintAvailable) return "Chronicle FREE Bundle";
+        return `Chronicle Bundle (${PAID_MINT_PRICE_USDC} USDC)`;
     };
 
     return (
@@ -194,16 +218,20 @@ function HomePage() {
                 <div className="supply-info">
                     {maxSupply > 0 ? `${mintedCount.toLocaleString()} / ${maxSupply.toLocaleString()} CHRONICLED` : "Loading..."}
                 </div>
-                <div className="price-info">
-                    { !account ? `Price: ${PAID_MINT_PRICE_USDC} USDC per bundle` : isFreeMintAvailable ? "Price: FREE (1-time offer!)" : `Price: ${PAID_MINT_PRICE_USDC} USDC per bundle` }
-                </div>
-
+                
                 {!account ? (
-                    <button className="action-button connect-button" onClick={connectWallet} disabled={isConnecting}>
-                        {isConnecting ? "Connecting..." : "Connect Wallet"}
-                    </button>
+                    <>
+                        <div className="price-info">Price: {PAID_MINT_PRICE_USDC} USDC per bundle</div>
+                        <button className="action-button connect-button" onClick={connectWallet} disabled={isConnecting}>
+                            {isConnecting ? "Connecting..." : "Connect Wallet"}
+                        </button>
+                    </>
                 ) : (
                     <>
+                        <div className="price-info">
+                            {isFreeMintAvailable ? "Price: FREE (1-time offer!)" : `Price: ${PAID_MINT_PRICE_USDC} USDC per bundle`}
+                        </div>
+
                         <div className="file-upload-section">
                             <input type="file" multiple accept="image/*,video/*" onChange={handleFileChange} ref={fileInputRef} style={{ display: 'none' }} />
                             <button className="select-files-button" onClick={triggerFileSelect}>
