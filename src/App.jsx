@@ -3,6 +3,7 @@ import ReactGA from 'react-ga4';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import WalletProvider from './providers/WalletProvider';
 import HomePage from './pages/HomePage';
+import GalleryPage from './pages/GalleryPage'; // <-- 1. Import the new page
 import EventDetailPage from './pages/events/EventDetailPage';
 import Header from './components/Header';
 
@@ -26,6 +27,7 @@ function App() {
           <main className="w-full flex-grow flex items-center justify-center">
             <Routes>
               <Route path="/" element={<HomePage />} />
+              <Route path="/gallery" element={<GalleryPage />} /> {/* <-- 2. Add the new route */}
               <Route path="/chronicle/:tokenId" element={<EventDetailPage />} />
             </Routes>
           </main>

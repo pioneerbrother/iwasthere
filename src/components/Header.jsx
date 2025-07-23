@@ -14,6 +14,10 @@ function Header() {
           I Was There
         </span>
       </Link>
+        {/* --- NEW LINK TO THE GALLERY --- */}
+      <Link to="/gallery" className="font-semibold text-cream hover:opacity-80 transition-opacity">
+        My Chronicles
+      </Link>
     </header>
   );
 }
