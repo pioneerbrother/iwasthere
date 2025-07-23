@@ -5,9 +5,7 @@ import WalletProvider from './providers/WalletProvider';
 import HomePage from './pages/HomePage';
 import EventDetailPage from './pages/events/EventDetailPage';
 import Header from './components/Header';
-// We no longer need to import App.css
 
-// --- Google Analytics Initialization ---
 const GA_MEASUREMENT_ID = import.meta.env.VITE_GA_MEASUREMENT_ID;
 if (GA_MEASUREMENT_ID) {
   ReactGA.initialize(GA_MEASUREMENT_ID);
@@ -23,9 +21,9 @@ function App() {
   return (
     <WalletProvider>
       <Router>
-        <div className="min-h-screen flex flex-col items-center p-4 font-poppins">
+        <div className="min-h-screen w-full flex flex-col items-center p-4 font-poppins text-warm-brown">
           <Header />
-          <main className="flex-grow flex items-center justify-center w-full">
+          <main className="w-full flex-grow flex items-center justify-center">
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/chronicle/:tokenId" element={<EventDetailPage />} />

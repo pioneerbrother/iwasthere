@@ -1,0 +1,491 @@
+/* Nature-Inspired I Was There Homepage Styles */
+
+/* Organic gradient background with earth tones */
+.homepage-main-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 80px);
+    padding: 20px;
+    background: linear-gradient(-45deg, #ff7f50, #daa520, #87a96b, #2d5016, #cd853f);
+    background-size: 400% 400%;
+    animation: naturalGradientShift 20s ease infinite;
+    position: relative;
+    overflow: hidden;
+    font-family: 'Poppins', sans-serif;
+}
+
+/* Natural gradient animation - slower and more organic */
+@keyframes naturalGradientShift {
+    0% { background-position: 0% 50%; }
+    25% { background-position: 100% 25%; }
+    50% { background-position: 50% 100%; }
+    75% { background-position: 25% 0%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* Floating natural elements like seeds or pollen */
+.homepage-main-container::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: 
+        radial-gradient(circle at 20% 80%, rgba(218, 165, 32, 0.15) 2px, transparent 2px),
+        radial-gradient(circle at 80% 20%, rgba(135, 169, 107, 0.1) 1px, transparent 1px),
+        radial-gradient(circle at 40% 40%, rgba(255, 127, 80, 0.08) 1.5px, transparent 1.5px);
+    background-size: 80px 80px, 120px 120px, 60px 60px;
+    animation: gentleFloat 25s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes gentleFloat {
+    0% { transform: translate(0, 0) rotate(0deg); }
+    100% { transform: translate(-30px, -30px) rotate(180deg); }
+}
+
+/* Warm, natural glass morphism card */
+.mint-card {
+    background: rgba(245, 245, 220, 0.25); /* Cream tinted */
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(139, 69, 19, 0.3); /* Warm brown border */
+    border-radius: 24px;
+    box-shadow: 
+        0 8px 32px rgba(139, 69, 19, 0.15),
+        0 0 0 1px rgba(245, 245, 220, 0.2),
+        inset 0 1px 0 rgba(245, 245, 220, 0.3);
+    padding: 48px;
+    text-align: center;
+    max-width: 520px;
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    animation: fadeInScale 0.8s ease-out;
+}
+
+/* Subtle texture overlay for natural feel */
+.mint-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        radial-gradient(circle at 30% 70%, rgba(139, 69, 19, 0.03) 1px, transparent 1px),
+        radial-gradient(circle at 70% 30%, rgba(45, 80, 22, 0.02) 1px, transparent 1px);
+    background-size: 20px 20px, 15px 15px;
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.mint-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(218, 165, 32, 0.1), transparent);
+    transition: left 0.6s;
+}
+
+.mint-card:hover::after {
+    left: 100%;
+}
+
+.mint-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 
+        0 12px 40px rgba(139, 69, 19, 0.2),
+        0 0 0 1px rgba(245, 245, 220, 0.3),
+        inset 0 1px 0 rgba(245, 245, 220, 0.4);
+}
+
+@keyframes fadeInScale {
+    0% {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Natural gradient text effects */
+.card-title {
+    font-size: 2.8rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #2d5016, #87a96b, #8b4513);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 16px;
+    text-shadow: 0 2px 4px rgba(139, 69, 19, 0.1);
+    letter-spacing: -0.02em;
+}
+
+.card-subtitle {
+    font-size: 1.2rem;
+    color: rgba(139, 69, 19, 0.9); /* Warm brown instead of white */
+    margin-bottom: 32px;
+    font-weight: 400;
+    line-height: 1.6;
+}
+
+/* Earth-toned info sections */
+.supply-info {
+    font-size: 1.3rem;
+    font-weight: 600;
+    background: linear-gradient(135deg, #ff7f50, #daa520); /* Sunset to golden */
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 16px;
+    padding: 12px 24px;
+    border-radius: 12px;
+    background-color: rgba(245, 245, 220, 0.2);
+    border: 1px solid rgba(218, 165, 32, 0.3);
+}
+
+.price-info {
+    font-size: 1.3rem;
+    font-weight: 600;
+    background: linear-gradient(135deg, #87a96b, #2d5016); /* Sage to forest */
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 24px;
+    padding: 12px 24px;
+    border-radius: 12px;
+    background-color: rgba(245, 245, 220, 0.2);
+    border: 1px solid rgba(135, 169, 107, 0.3);
+}
+
+/* Natural button styling */
+.action-button {
+    padding: 16px 32px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #f5f5dc; /* Cream text */
+    border: none;
+    border-radius: 16px;
+    cursor: pointer;
+    min-width: 280px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 15px rgba(139, 69, 19, 0.3);
+}
+
+.action-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(245, 245, 220, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+.action-button:hover::before {
+    left: 100%;
+}
+
+.connect-button {
+    background: linear-gradient(135deg, #cd853f, #8b4513); /* Terracotta to brown */
+    border: 1px solid rgba(245, 245, 220, 0.2);
+}
+
+.connect-button:hover {
+    background: linear-gradient(135deg, #8b4513, #654321);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(205, 133, 63, 0.4);
+}
+
+.mint-button {
+    background: linear-gradient(135deg, #87a96b, #2d5016); /* Sage to forest */
+    border: 1px solid rgba(245, 245, 220, 0.2);
+}
+
+.mint-button:hover:not(:disabled) {
+    background: linear-gradient(135deg, #2d5016, #1a3009);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(135, 169, 107, 0.4);
+}
+
+.action-button:disabled {
+    background: linear-gradient(135deg, #a0a0a0, #808080);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 2px 8px rgba(139, 69, 19, 0.1);
+}
+
+/* Natural file upload section */
+.file-upload-section {
+    margin-bottom: 28px;
+    padding: 32px;
+    border: 3px dashed rgba(139, 69, 19, 0.4); /* Brown dashed border */
+    border-radius: 20px;
+    background: linear-gradient(135deg, rgba(245, 245, 220, 0.15), rgba(135, 169, 107, 0.1));
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+.file-upload-section::before {
+    content: '🌿'; /* Natural leaf icon */
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    font-size: 2rem;
+    opacity: 0.4;
+    animation: gentlePulse 3s infinite;
+}
+
+@keyframes gentlePulse {
+    0%, 100% { opacity: 0.4; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.05); }
+}
+
+.file-upload-section:hover {
+    border-color: rgba(218, 165, 32, 0.6); /* Golden hover */
+    background: linear-gradient(135deg, rgba(218, 165, 32, 0.2), rgba(255, 127, 80, 0.1));
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(139, 69, 19, 0.15);
+}
+
+.file-upload-section.drag-over {
+    border-color: #ff7f50; /* Sunset orange */
+    background: linear-gradient(135deg, rgba(255, 127, 80, 0.25), rgba(218, 165, 32, 0.15));
+    transform: scale(1.02);
+}
+
+.file-input {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 10;
+}
+
+.file-prompt-text {
+    color: rgba(139, 69, 19, 0.9); /* Warm brown text */
+    font-weight: 600;
+    text-align: center;
+    margin: 0;
+    z-index: 5;
+    font-size: 1.1rem;
+    text-shadow: 0 1px 2px rgba(245, 245, 220, 0.3);
+}
+
+.selected-files-info {
+    font-size: 1rem;
+    color: rgba(139, 69, 19, 0.8);
+    text-align: center;
+    margin: 8px 0 0 0;
+    z-index: 5;
+    font-weight: 500;
+}
+
+.select-files-button {
+    background: linear-gradient(135deg, #daa520, #ff7f50); /* Golden to sunset */
+    color: #f5f5dc; /* Cream text */
+    padding: 14px 28px;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 15px rgba(218, 165, 32, 0.3);
+}
+
+.select-files-button:hover {
+    background: linear-gradient(135deg, #ff7f50, #cd853f);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(218, 165, 32, 0.4);
+}
+
+/* Natural status and feedback text */
+.status-text {
+    font-size: 1.1rem;
+    color: rgba(139, 69, 19, 0.9);
+    margin-top: 24px;
+    min-height: 24px;
+    font-weight: 500;
+    text-shadow: 0 1px 2px rgba(245, 245, 220, 0.3);
+}
+
+.feedback-text {
+    font-size: 1rem;
+    color: #cd5c5c; /* Natural red-brown for errors */
+    margin-top: 24px;
+    min-height: 24px;
+    font-weight: 500;
+    background: rgba(205, 92, 92, 0.1);
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid rgba(205, 92, 92, 0.2);
+}
+
+/* Natural gallery link */
+.gallery-link-prompt {
+    margin-top: 32px;
+    font-size: 1.1rem;
+}
+
+.gallery-link-prompt a {
+    color: #daa520; /* Golden */
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    text-shadow: 0 1px 2px rgba(139, 69, 19, 0.1);
+}
+
+.gallery-link-prompt a:hover {
+    color: #ff7f50; /* Sunset orange */
+    text-decoration: underline;
+    text-shadow: 0 0 8px rgba(218, 165, 32, 0.5);
+}
+
+/* Natural transaction link */
+.tx-link {
+    margin-top: 24px;
+    font-size: 1rem;
+}
+
+.tx-link a {
+    color: #87a96b; /* Sage green */
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.tx-link a:hover {
+    color: #2d5016; /* Forest green */
+    text-decoration: underline;
+    text-shadow: 0 0 8px rgba(135, 169, 107, 0.5);
+}
+
+/* Natural file details */
+.selected-files-details {
+    font-size: 1rem;
+    color: rgba(139, 69, 19, 0.8);
+    text-align: center;
+    margin-top: 12px;
+    background: rgba(245, 245, 220, 0.2);
+    padding: 12px 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(139, 69, 19, 0.2);
+}
+
+.selected-files-details p {
+    margin: 6px 0;
+    line-height: 1.5;
+}
+
+.size-tracker {
+    font-weight: 600;
+}
+
+.size-tracker strong {
+    color: #daa520; /* Golden */
+    font-weight: 700;
+    text-shadow: 0 1px 2px rgba(139, 69, 19, 0.1);
+}
+
+/* Responsive design for natural theme */
+@media (max-width: 768px) {
+    .homepage-main-container {
+        padding: 16px;
+    }
+    
+    .mint-card {
+        padding: 32px 24px;
+        margin: 0 8px;
+    }
+    
+    .card-title {
+        font-size: 2.2rem;
+    }
+    
+    .action-button {
+        min-width: 240px;
+        padding: 14px 24px;
+    }
+    
+    .file-upload-section {
+        padding: 24px 16px;
+        min-height: 100px;
+    }
+}
+
+/* Natural loading animation */
+@keyframes naturalSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(139, 69, 19, 0.3);
+    border-radius: 50%;
+    border-top-color: #daa520; /* Golden */
+    animation: naturalSpin 1s ease-in-out infinite;
+    margin-right: 8px;
+}
+
+/* Additional natural elements */
+.homepage-main-container::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        radial-gradient(circle at 15% 85%, rgba(218, 165, 32, 0.08) 3px, transparent 3px),
+        radial-gradient(circle at 85% 15%, rgba(135, 169, 107, 0.06) 2px, transparent 2px),
+        radial-gradient(circle at 50% 50%, rgba(255, 127, 80, 0.04) 1px, transparent 1px);
+    background-size: 150px 150px, 200px 200px, 100px 100px;
+    animation: organicFloat 30s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes organicFloat {
+    0% { transform: translate(0, 0) rotate(0deg); }
+    100% { transform: translate(-50px, -25px) rotate(90deg); }
+}
+
+/* Natural focus states */
+.action-button:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(218, 165, 32, 0.5);
+}
+
+.file-input:focus + .file-prompt-text {
+    color: #daa520;
+    text-shadow: 0 0 10px rgba(218, 165, 32, 0.5);
+}
