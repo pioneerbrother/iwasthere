@@ -6,14 +6,13 @@ const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY;
 const IWT_CONTRACT_ADDRESS = import.meta.env.VITE_IWAS_THERE_NFT_ADDRESS;
 const ALCHEMY_URL = `https://polygon-mainnet.g.alchemy.com/nft/v3/${ALCHEMY_API_KEY}/getNFTsForOwner`;
 
-// A robust function to always use a reliable IPFS gateway
-const formatIpfsUrl = (url ) => {
+// A robust function to always use the reliable Pinata gateway
+const formatIpfsUrl = (url) => {
     if (!url) return '';
+    // This handles both ipfs:// protocol and older ipfs.io links
     if (url.startsWith('ipfs://')) {
-        // Convert ipfs:// URI to a full gateway URL
-        return `https://gateway.pinata.cloud/ipfs/${url.substring(7 )}`;
+        return `https://gateway.pinata.cloud/ipfs/${url.substring(7)}`;
     }
-    // If it's already a URL, ensure it uses a reliable gateway
     return url.replace('ipfs.io', 'gateway.pinata.cloud');
 };
 
@@ -25,82 +24,56 @@ function GalleryPage() {
 
     useEffect(() => {
         const fetchNfts = async () => {
-            if (!account) {
-                setNfts([]);
-                return;
-            }
-            if (!ALCHEMY_API_KEY || !IWT_CONTRACT_ADDRESS) {
-                setError("Configuration error: Missing API Key or Contract Address.");
-                return;
-            }
-
+            if (!account) { setNfts([]); return; }
             setIsLoading(true);
             setError('');
-            setNfts([]);
-
             try {
+                // Fetch all NFTs for the owner from your contract
                 const response = await fetch(`${ALCHEMY_URL}?owner=${account}&contractAddresses[]=${IWT_CONTRACT_ADDRESS}&withMetadata=true`);
-                
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch NFTs. Status: ${response.status}`);
-                }
-
+                if (!response.ok) throw new Error('Failed to fetch NFTs from Alchemy.');
                 const data = await response.json();
                 
-                // --- THIS IS THE KEY FIX ---
                 const formattedNfts = data.ownedNfts
+                    // Filter out any NFTs that might be missing the crucial media property
+                    .filter(nft => nft.raw?.metadata?.properties?.media && Array.isArray(nft.raw.metadata.properties.media))
                     .map(nft => {
-                        // 1. Safely access the media array from the metadata properties
-                        const mediaArray = nft.raw?.metadata?.properties?.media || [];
+                        console.log(`Processing Token ID #${nft.tokenId}, Media count:`, nft.raw.metadata.properties.media.length);
                         
-                        console.log(`Processing Token ID #${nft.tokenId}, Media count:`, mediaArray.length);
-                        
-                        // 2. Ensure every item in the media array has a valid gatewayUrl
-                        const processedMedia = mediaArray.map(item => ({
-                            ...item,
-                            gatewayUrl: formatIpfsUrl(item.gatewayUrl || `ipfs://${item.cid}`)
-                        }));
-
                         return {
                             tokenId: nft.tokenId,
                             title: nft.name || 'Untitled Chronicle',
                             description: nft.description || 'No description provided.',
-                            media: processedMedia, // 3. Assign the fully processed array
+                            // --- THIS IS THE KEY FIX ---
+                            // Correctly map over the media array and format each URL
+                            media: nft.raw.metadata.properties.media.map(item => ({
+                                ...item,
+                                // Ensure every item has a valid, working gateway URL
+                                gatewayUrl: formatIpfsUrl(item.gatewayUrl || `ipfs://${item.cid}`)
+                            }))
                         };
-                    })
-                    // Filter out any NFTs that didn't have valid media properties
-                    .filter(nft => nft.media.length > 0);
+                    });
 
                 setNfts(formattedNfts.reverse()); // Show newest first
                 if (formattedNfts.length === 0) {
-                    setError("You don't own any 'I Was There' Chronicles yet, or the metadata is still loading.");
+                    setError("You don't own any Chronicles yet, or the metadata is still loading.");
                 }
-
             } catch (err) {
                 console.error("Error fetching or processing NFTs:", err);
-                setError(err.message || "An error occurred while fetching your Chronicles.");
+                setError(err.message);
             } finally {
                 setIsLoading(false);
             }
         };
-
         fetchNfts();
     }, [account]);
 
-    // The rest of the component remains the same, as the rendering logic was already correct.
-    // The problem was the data being fed into it.
-
     if (!account) {
         return (
-            <div className="w-full max-w-4xl mx-auto px-4 text-center">
+            <div className="text-center">
                 <h1 className="text-4xl font-bold text-warm-brown mb-8">My Chronicles</h1>
-                <div className="bg-cream/20 backdrop-blur-md rounded-xl shadow-lg border border-warm-brown/20 p-8">
-                    <p className="text-warm-brown mb-6">Connect your wallet to view your Chronicles</p>
-                    <button 
-                        onClick={connectWallet}
-                        disabled={isConnecting}
-                        className="bg-sage-green hover:bg-forest-green text-white font-bold py-3 px-6 rounded-lg transition-colors disabled:opacity-50"
-                    >
+                <div className="bg-cream/20 p-8 rounded-xl shadow-lg">
+                    <p className="mb-6">Connect your wallet to view your memories.</p>
+                    <button onClick={connectWallet} disabled={isConnecting} className="bg-sage-green text-white font-bold py-2 px-4 rounded-lg">
                         {isConnecting ? 'Connecting...' : 'Connect Wallet'}
                     </button>
                 </div>
@@ -112,70 +85,49 @@ function GalleryPage() {
         <div className="w-full max-w-6xl mx-auto px-4">
             <h1 className="text-4xl font-bold text-warm-brown text-center mb-8">My Chronicles</h1>
             
-            {isLoading && (
-                <div className="text-center">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-warm-brown"></div>
-                    <p className="mt-2 text-warm-brown">Loading your memories...</p>
-                </div>
-            )}
-            
-            {error && (
-                <div className="text-center">
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 inline-block">
-                        <p className="text-red-600">{error}</p>
-                    </div>
-                </div>
-            )}
+            {isLoading && <div className="text-center text-warm-brown">Loading...</div>}
+            {error && <div className="text-center text-red-600">{error}</div>}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {nfts.map(nft => (
-                    <div key={nft.tokenId} className="bg-cream/20 backdrop-blur-md rounded-xl shadow-lg border border-warm-brown/20 flex flex-col overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                    <div key={nft.tokenId} className="bg-cream/20 backdrop-blur-md rounded-xl shadow-lg border border-warm-brown/20 flex flex-col overflow-hidden">
                         
-                        <div className="grid grid-cols-2 grid-rows-2 h-64 gap-0.5 bg-warm-brown/10">
-                            {/* Display up to the first 4 images */}
+                        {/* --- THIS IS THE 2x2 GRID FIX --- */}
+                        <div className="grid grid-cols-2 grid-rows-2 h-64">
+                            {/* Map over the first 4 media items to create the preview */}
                             {nft.media.slice(0, 4).map((item, index) => (
-                                <div key={index} className="relative overflow-hidden bg-cream/10 group">
-                                    <a href={item.gatewayUrl} target="_blank" rel="noopener noreferrer" className="block w-full h-full">
-                                        <img 
-                                            src={item.gatewayUrl} 
-                                            alt={item.fileName || `Media ${index + 1}`}
-                                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                                            loading="lazy"
-                                        />
-                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
-                                    </a>
-                                </div>
+                                <a href={item.gatewayUrl} target="_blank" rel="noopener noreferrer" key={index} className="bg-cream/10">
+                                    <img 
+                                        src={item.gatewayUrl} 
+                                        alt={item.fileName || 'Chronicle Media'} 
+                                        className="w-full h-full object-cover" 
+                                    />
+                                </a>
                             ))}
-                            
-                            {/* Render placeholders for the remaining empty slots */}
+                            {/* This creates placeholder boxes if there are fewer than 4 images */}
                             {Array.from({ length: Math.max(0, 4 - nft.media.length) }).map((_, i) => (
                                 <div key={`placeholder-${i}`} className="bg-cream/10 flex items-center justify-center">
-                                    <div className="text-warm-brown/40 text-xs">No Image</div>
+                                    {/* Conditionally render "No Image" only if it's a true empty slot */}
+                                    {i + nft.media.length < 4 && <span className="text-warm-brown/40 text-xs">No Image</span>}
                                 </div>
                             ))}
                         </div>
                         
                         <div className="p-6 flex-1 flex flex-col">
-                            <h2 className="text-2xl font-bold text-warm-brown truncate mb-1" title={nft.title}>{nft.title}</h2>
+                            <h2 className="text-2xl font-bold text-warm-brown truncate" title={nft.title}>{nft.title}</h2>
                             <p className="text-sm text-warm-brown/70 mb-2">Token ID: {nft.tokenId}</p>
-                            <p className="text-sm text-warm-brown/80 italic line-clamp-2 mb-4 flex-1" title={nft.description}>
+                            <p className="text-sm text-warm-brown/80 italic line-clamp-2 mb-4" title={nft.description}>
                                 {nft.description}
                             </p>
                             
                             <div className="mt-auto">
                                 <h3 className="font-semibold text-warm-brown mb-2">
-                                    All Media ({nft.media.length} {nft.media.length === 1 ? 'item' : 'items'}):
+                                    All Media ({nft.media.length}):
                                 </h3>
                                 <ul className="text-sm space-y-1 max-h-24 overflow-y-auto">
                                     {nft.media.map((item, index) => (
                                         <li key={index}>
-                                            <a 
-                                                href={item.gatewayUrl} 
-                                                target="_blank" 
-                                                rel="noopener noreferrer" 
-                                                className="text-sage-green hover:text-forest-green hover:underline truncate block transition-colors"
-                                                title={item.fileName || `Item ${index + 1}`}
-                                            >
+                                            <a href={item.gatewayUrl} target="_blank" rel="noopener noreferrer" className="text-sage-green hover:text-forest-green hover:underline truncate block">
                                                 {item.fileName || `Item ${index + 1}`}
                                             </a>
                                         </li>
@@ -187,16 +139,11 @@ function GalleryPage() {
                 ))}
             </div>
             
-            {nfts.length > 0 && (
-                <div className="text-center mt-12">
-                    <Link 
-                        to="/" 
-                        className="inline-flex items-center font-bold text-sage-green hover:text-forest-green hover:underline transition-colors"
-                    >
-                        ← Chronicle another moment
-                    </Link>
-                </div>
-            )}
+            <div className="text-center mt-12">
+                <Link to="/" className="font-bold text-sage-green hover:text-forest-green hover:underline">
+                    ← Chronicle another moment
+                </Link>
+            </div>
         </div>
     );
 }
