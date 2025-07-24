@@ -7,10 +7,14 @@ const IWT_CONTRACT_ADDRESS = import.meta.env.VITE_IWAS_THERE_NFT_ADDRESS;
 const ALCHEMY_URL = `https://polygon-mainnet.g.alchemy.com/nft/v3/${ALCHEMY_API_KEY}/getNFTsForOwner`;
 
 // A robust function to always use the reliable Pinata gateway
-const formatIpfsUrl = (url) => {
+const formatIpfsUrl = (url ) => {
     if (!url) return '';
+    // Handle Pinata's gateway format which might already be correct
+    if (url.includes('gateway.pinata.cloud')) {
+        return url;
+    }
     if (url.startsWith('ipfs://')) {
-        return `https://gateway.pinata.cloud/ipfs/${url.substring(7)}`;
+        return `https://gateway.pinata.cloud/ipfs/${url.substring(7 )}`;
     }
     // Replace other common gateways just in case
     return url.replace('ipfs.io', 'gateway.pinata.cloud');
@@ -51,14 +55,17 @@ function GalleryPage() {
                     .map(nft => {
                         console.log(`Processing Token ID #${nft.tokenId}, Media count:`, nft.raw.metadata.properties.media.length);
                         
+                        // Correctly map all media items
+                        const allMedia = nft.raw.metadata.properties.media.map(item => ({
+                            ...item,
+                            gatewayUrl: formatIpfsUrl(item.gatewayUrl || `ipfs://${item.cid}`)
+                        }));
+
                         return {
                             tokenId: nft.tokenId,
                             title: nft.name || 'Untitled Chronicle',
                             description: nft.description || 'No description provided.',
-                            media: nft.raw.metadata.properties.media.map(item => ({
-                                ...item,
-                                gatewayUrl: formatIpfsUrl(item.gatewayUrl || `ipfs://${item.cid}`)
-                            })) || [],
+                            media: allMedia, // Use the fully mapped array
                         };
                     });
 
@@ -120,6 +127,7 @@ function GalleryPage() {
                     <div key={nft.tokenId} className="bg-cream/20 backdrop-blur-md rounded-xl shadow-lg border border-warm-brown/20 flex flex-col overflow-hidden hover:shadow-xl transition-shadow duration-300">
                         
                         <div className="grid grid-cols-2 grid-rows-2 h-64 gap-0.5 bg-warm-brown/10">
+                            {/* Display up to the first 4 images */}
                             {nft.media.slice(0, 4).map((item, index) => (
                                 <div key={index} className="relative overflow-hidden bg-cream/10 group">
                                     <a href={item.gatewayUrl} target="_blank" rel="noopener noreferrer" className="block w-full h-full">
@@ -134,6 +142,7 @@ function GalleryPage() {
                                 </div>
                             ))}
                             
+                            {/* Render placeholders for empty slots */}
                             {Array.from({ length: Math.max(0, 4 - nft.media.length) }).map((_, i) => (
                                 <div key={`placeholder-${i}`} className="bg-cream/10 flex items-center justify-center">
                                     <div className="text-warm-brown/40 text-xs">No Image</div>

@@ -29,6 +29,7 @@ function HomePage() {
     const [selectedFiles, setSelectedFiles] = useState([]);
     const [isFreeMintAvailable, setIsFreeMintAvailable] = useState(false);
     const [latestTxHash, setLatestTxHash] = useState('');
+    const [title, setTitle] = useState(''); // <-- State for the title
     const [description, setDescription] = useState(''); // <-- State for the description
     
     const fileInputRef = useRef(null);
@@ -104,7 +105,7 @@ function HomePage() {
             return;
         }
         setSelectedFiles(files);
-        setFeedback("Files selected. Add a note and you're ready to Chronicle.");
+        setFeedback("Files selected. Add a title and note, and you're ready to Chronicle.");
         setLatestTxHash('');
     }, []);
 
@@ -136,7 +137,8 @@ function HomePage() {
                     walletAddress: account, 
                     signature, 
                     isFreeMint: isFreeMintAvailable,
-                    description: description // <-- Send the description to the backend
+                    title: title, // <-- Send the title
+                    description: description // <-- Send the description
                 }),
             });
             const processMintResult = await processMintResponse.json();
@@ -164,6 +166,7 @@ function HomePage() {
                 setLatestTxHash(mintTx.hash);
             }
             setSelectedFiles([]);
+            setTitle(''); // <-- Clear title on success
             setDescription(''); // <-- Clear description on success
             if (fileInputRef.current) fileInputRef.current.value = "";
             setMintedCount(prev => prev + 1);
@@ -173,7 +176,7 @@ function HomePage() {
         } finally {
             setIsLoading(false);
         }
-    }, [account, signer, selectedFiles, isFreeMintAvailable, checkFreeMint, description]); // <-- Add description to dependencies
+    }, [account, signer, selectedFiles, isFreeMintAvailable, checkFreeMint, title, description]); // <-- Add title and description to dependencies
 
     const mintButtonText = () => {
         if (isLoading) return "Processing...";
@@ -222,10 +225,17 @@ function HomePage() {
                     
                     {selectedFiles.length > 0 && (
                         <>
+                            <input
+                                type="text"
+                                className="w-full p-3 bg-cream/20 rounded-lg border border-warm-brown/30 text-warm-brown/90 placeholder-warm-brown/50 focus:ring-2 focus:ring-golden-yellow focus:outline-none transition"
+                                placeholder="Add a title for your Chronicle..."
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                            />
                             <textarea
                                 className="w-full p-3 bg-cream/20 rounded-lg border border-warm-brown/30 text-warm-brown/90 placeholder-warm-brown/50 focus:ring-2 focus:ring-golden-yellow focus:outline-none transition"
                                 rows="3"
-                                placeholder="Add a note or description to your Chronicle..."
+                                placeholder="Add a note or description..."
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
                             />
@@ -244,7 +254,7 @@ function HomePage() {
                         View Transaction
                     </a>
                 </div>
-            )}
+             )}
         </div>
     );
 }
