@@ -15,7 +15,7 @@ const PINATA_GATEWAY = 'https://gateway.pinata.cloud/ipfs/';
 const IWAS_THERE_ABI_MINIMAL = [ "function mintFree(address to, string memory _tokenURI)" ];
 
 exports.handler = async function(event, context) {
-    console.log("--- processMint function invoked (Definitive Final Version) ---");
+    console.log("--- processMint function invoked (v5 Final) ---");
 
     try {
         if (event.httpMethod !== 'POST') {
@@ -49,7 +49,10 @@ exports.handler = async function(event, context) {
             const formData = new FormData();
             formData.append('file', fileBuffer, { filename: fileData.fileName, contentType: fileData.fileType });
 
-            const pinataMetadata = JSON.stringify({ name: fileData.fileName });
+            const pinataMetadata = JSON.stringify({
+                name: fileData.fileName,
+                keyvalues: { uploader: walletAddress }
+            });
             formData.append('pinataMetadata', pinataMetadata);
 
             const pinataFileRes = await fetch(PINATA_API_URL, {
@@ -72,19 +75,17 @@ exports.handler = async function(event, context) {
         }
         
         const nftMetadata = {
-            name: title || `Chronicle Bundle by ${walletAddress.slice(0, 6)}...`,
-            description: description,
-            image: mediaItems.length > 0 ? mediaItems[0].gatewayUrl : null,
-            properties: { 
-                media: mediaItems 
-            }
+            name: title || `Chronicle Bundle by ${walletAddress}`,
+            description: description || "A collection of memories chronicled on the blockchain.",
+            image: mediaItems[0] ? mediaItems[0].gatewayUrl : null,
+            properties: { media: mediaItems }
         };
 
         const metadataBuffer = Buffer.from(JSON.stringify(nftMetadata));
         const metadataFormData = new FormData();
         metadataFormData.append('file', metadataBuffer, { filename: 'metadata.json', contentType: 'application/json' });
         
-        const pinataMetadataForJson = JSON.stringify({ name: `metadata_${walletAddress.slice(0, 6)}_${Date.now()}.json` });
+        const pinataMetadataForJson = JSON.stringify({ name: `metadata.json` });
         metadataFormData.append('pinataMetadata', pinataMetadataForJson);
         
         const pinataMetadataRes = await fetch(PINATA_API_URL, {
@@ -124,15 +125,12 @@ exports.handler = async function(event, context) {
                 statusCode: 200,
                 body: JSON.stringify({
                     metadataCID,
-                    message: "Upload successful. Ready for minting."
+                    message: "Upload successful."
                 })
             };
         }
     } catch (error) {
         console.error("--- CRITICAL ERROR in processMint function ---", error);
-        return { 
-            statusCode: 500, 
-            body: JSON.stringify({ error: error.message }) 
-        };
+        return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
     }
 };

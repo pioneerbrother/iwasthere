@@ -6,13 +6,13 @@ const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY;
 const IWT_CONTRACT_ADDRESS = import.meta.env.VITE_IWAS_THERE_NFT_ADDRESS;
 const ALCHEMY_URL = `https://polygon-mainnet.g.alchemy.com/nft/v3/${ALCHEMY_API_KEY}/getNFTsForOwner`;
 
-// A robust function to always use the reliable Pinata gateway
+// A robust function to always use the reliable Pinata gateway for all images
 const formatIpfsUrl = (url) => {
     if (!url) return '';
-    // This handles both ipfs:// protocol and older ipfs.io links
     if (url.startsWith('ipfs://')) {
         return `https://gateway.pinata.cloud/ipfs/${url.substring(7)}`;
     }
+    // This handles older URLs that might have used a different gateway
     return url.replace('ipfs.io', 'gateway.pinata.cloud');
 };
 
@@ -24,39 +24,45 @@ function GalleryPage() {
 
     useEffect(() => {
         const fetchNfts = async () => {
-            if (!account) { setNfts([]); return; }
+            if (!account) {
+                setNfts([]);
+                return;
+            }
+            if (!ALCHEMY_API_KEY || !IWT_CONTRACT_ADDRESS) {
+                setError("Configuration error: Missing API Key or Contract Address.");
+                return;
+            }
+
             setIsLoading(true);
             setError('');
+            setNfts([]);
+
             try {
-                // Fetch all NFTs for the owner from your contract
                 const response = await fetch(`${ALCHEMY_URL}?owner=${account}&contractAddresses[]=${IWT_CONTRACT_ADDRESS}&withMetadata=true`);
-                if (!response.ok) throw new Error('Failed to fetch NFTs from Alchemy.');
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch NFTs (status: ${response.status})`);
+                }
                 const data = await response.json();
                 
                 const formattedNfts = data.ownedNfts
-                    // Filter out any NFTs that might be missing the crucial media property
                     .filter(nft => nft.raw?.metadata?.properties?.media && Array.isArray(nft.raw.metadata.properties.media))
                     .map(nft => {
-                        console.log(`Processing Token ID #${nft.tokenId}, Media count:`, nft.raw.metadata.properties.media.length);
-                        
                         return {
                             tokenId: nft.tokenId,
                             title: nft.name || 'Untitled Chronicle',
                             description: nft.description || 'No description provided.',
-                            // --- THIS IS THE KEY FIX ---
-                            // Correctly map over the media array and format each URL
                             media: nft.raw.metadata.properties.media.map(item => ({
                                 ...item,
-                                // Ensure every item has a valid, working gateway URL
                                 gatewayUrl: formatIpfsUrl(item.gatewayUrl || `ipfs://${item.cid}`)
                             }))
                         };
                     });
 
-                setNfts(formattedNfts.reverse()); // Show newest first
+                setNfts(formattedNfts.reverse());
                 if (formattedNfts.length === 0) {
                     setError("You don't own any Chronicles yet, or the metadata is still loading.");
                 }
+
             } catch (err) {
                 console.error("Error fetching or processing NFTs:", err);
                 setError(err.message);
@@ -86,29 +92,26 @@ function GalleryPage() {
             <h1 className="text-4xl font-bold text-warm-brown text-center mb-8">My Chronicles</h1>
             
             {isLoading && <div className="text-center text-warm-brown">Loading...</div>}
-            {error && <div className="text-center text-red-600">{error}</div>}
+            {error && <div className="text-center text-red-600 bg-red-100 p-4 rounded-lg">{error}</div>}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {nfts.map(nft => (
                     <div key={nft.tokenId} className="bg-cream/20 backdrop-blur-md rounded-xl shadow-lg border border-warm-brown/20 flex flex-col overflow-hidden">
                         
-                        {/* --- THIS IS THE 2x2 GRID FIX --- */}
                         <div className="grid grid-cols-2 grid-rows-2 h-64">
-                            {/* Map over the first 4 media items to create the preview */}
                             {nft.media.slice(0, 4).map((item, index) => (
                                 <a href={item.gatewayUrl} target="_blank" rel="noopener noreferrer" key={index} className="bg-cream/10">
                                     <img 
                                         src={item.gatewayUrl} 
                                         alt={item.fileName || 'Chronicle Media'} 
                                         className="w-full h-full object-cover" 
+                                        onError={(e) => { e.target.style.display = 'none'; }} // Hide broken images
                                     />
                                 </a>
                             ))}
-                            {/* This creates placeholder boxes if there are fewer than 4 images */}
                             {Array.from({ length: Math.max(0, 4 - nft.media.length) }).map((_, i) => (
                                 <div key={`placeholder-${i}`} className="bg-cream/10 flex items-center justify-center">
-                                    {/* Conditionally render "No Image" only if it's a true empty slot */}
-                                    {i + nft.media.length < 4 && <span className="text-warm-brown/40 text-xs">No Image</span>}
+                                    <span className="text-warm-brown/40 text-xs"></span>
                                 </div>
                             ))}
                         </div>
