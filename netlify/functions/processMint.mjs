@@ -2,7 +2,7 @@ const fetch = require('node-fetch');
 const FormData = require('form-data');
 const { ethers } = require('ethers');
 const { getStore } = require("@netlify/blobs");
-const { Buffer } = require('buffer'); // <-- Explicitly require Buffer
+const { Buffer } = require('buffer');
 
 const PINATA_JWT = process.env.PINATA_JWT;
 const OWNER_PRIVATE_KEY_FOR_FREE_MINTS = process.env.OWNER_PRIVATE_KEY_FOR_FREE_MINTS;
@@ -35,6 +35,7 @@ exports.handler = async function(event, context) {
         }
 
         const freeMintStore = getStore({ name: "iwasthere-free-mints", siteID: process.env.NETLIFY_SITE_ID, token: process.env.NETLIFY_API_TOKEN });
+
         if (isFreeMint) {
             const hasUsedFreeMint = await freeMintStore.get(walletAddress.toLowerCase());
             if (hasUsedFreeMint) {
@@ -47,13 +48,16 @@ exports.handler = async function(event, context) {
             const fileBuffer = Buffer.from(fileData.fileContentBase64, 'base64');
             const formData = new FormData();
             formData.append('file', fileBuffer, { filename: fileData.fileName, contentType: fileData.fileType });
+
             const pinataMetadata = JSON.stringify({ name: fileData.fileName });
             formData.append('pinataMetadata', pinataMetadata);
+
             const pinataFileRes = await fetch(PINATA_API_URL, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${PINATA_JWT}`, ...formData.getHeaders() },
                 body: formData
             });
+
             if (!pinataFileRes.ok) {
                 const errorText = await pinataFileRes.text();
                 throw new Error(`Pinata file upload failed: ${errorText}`);
@@ -69,21 +73,26 @@ exports.handler = async function(event, context) {
         
         const nftMetadata = {
             name: title || `Chronicle Bundle by ${walletAddress.slice(0, 6)}...`,
-            description: description || "A collection of memories chronicled on the blockchain.",
+            description: description,
             image: mediaItems.length > 0 ? mediaItems[0].gatewayUrl : null,
-            properties: { media: mediaItems }
+            properties: { 
+                media: mediaItems 
+            }
         };
 
         const metadataBuffer = Buffer.from(JSON.stringify(nftMetadata));
         const metadataFormData = new FormData();
         metadataFormData.append('file', metadataBuffer, { filename: 'metadata.json', contentType: 'application/json' });
+        
         const pinataMetadataForJson = JSON.stringify({ name: `metadata_${walletAddress.slice(0, 6)}_${Date.now()}.json` });
         metadataFormData.append('pinataMetadata', pinataMetadataForJson);
+        
         const pinataMetadataRes = await fetch(PINATA_API_URL, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${PINATA_JWT}`, ...metadataFormData.getHeaders() },
             body: metadataFormData
         });
+
         if (!pinataMetadataRes.ok) {
             const errorText = await pinataMetadataRes.text();
             throw new Error(`Pinata metadata upload failed: ${errorText}`);
@@ -93,12 +102,15 @@ exports.handler = async function(event, context) {
 
         if (isFreeMint) {
             if (!OWNER_PRIVATE_KEY_FOR_FREE_MINTS) throw new Error("Relayer key not configured.");
+            
             const provider = new ethers.providers.JsonRpcProvider(POLYGON_RPC_URL);
             const ownerWallet = new ethers.Wallet(OWNER_PRIVATE_KEY_FOR_FREE_MINTS, provider);
             const iWasThereContract = new ethers.Contract(IWAS_THERE_NFT_ADDRESS, IWAS_THERE_ABI_MINIMAL, ownerWallet);
+
             const tx = await iWasThereContract.mintFree(walletAddress, `ipfs://${metadataCID}`);
             // Fire and Forget
             await freeMintStore.set(walletAddress.toLowerCase(), "used");
+
             return {
                 statusCode: 200,
                 body: JSON.stringify({
@@ -117,14 +129,10 @@ exports.handler = async function(event, context) {
             };
         }
     } catch (error) {
-        // --- YOUR EXCELLENT LOGGING FIX ---
-        // Log the entire error object for detailed debugging
-        console.error("--- CRITICAL ERROR in processMint function ---", error); 
-        
-        // Return a valid JSON error message that includes the full error
+        console.error("--- CRITICAL ERROR in processMint function ---", error);
         return { 
             statusCode: 500, 
-            body: JSON.stringify({ error: `Function crashed: ${error.toString()}` }) 
+            body: JSON.stringify({ error: error.message }) 
         };
     }
 };
