@@ -98,21 +98,18 @@ function GalleryPage() {
                 {nfts.map(nft => (
                     <div key={nft.tokenId} className="bg-cream/20 backdrop-blur-md rounded-xl shadow-lg border border-warm-brown/20 flex flex-col overflow-hidden">
                         
-                        <div className="grid grid-cols-2 grid-rows-2 h-64">
-                            {nft.media.slice(0, 4).map((item, index) => (
-                                <a href={item.gatewayUrl} target="_blank" rel="noopener noreferrer" key={index} className="bg-cream/10">
+                        {/* --- CORRECTED MEDIA GRID --- */}
+                        {/* This grid now maps all media items and is flexible, removing the 4-item limit */}
+                        <div className="grid grid-cols-2 gap-1">
+                            {nft.media.map((item, index) => (
+                                <a href={item.gatewayUrl} target="_blank" rel="noopener noreferrer" key={index}>
                                     <img 
                                         src={item.gatewayUrl} 
                                         alt={item.fileName || 'Chronicle Media'} 
-                                        className="w-full h-full object-cover" 
-                                        onError={(e) => { e.target.style.display = 'none'; }} // Hide broken images
+                                        className="w-full h-full object-cover aspect-square" // aspect-square keeps the grid tidy
+                                        onError={(e) => { e.target.parentElement.style.display = 'none'; }} // Hide parent link on error
                                     />
                                 </a>
-                            ))}
-                            {Array.from({ length: Math.max(0, 4 - nft.media.length) }).map((_, i) => (
-                                <div key={`placeholder-${i}`} className="bg-cream/10 flex items-center justify-center">
-                                    <span className="text-warm-brown/40 text-xs"></span>
-                                </div>
                             ))}
                         </div>
                         
@@ -151,4 +148,4 @@ function GalleryPage() {
     );
 }
 
-export default GalleryPage;
+export default GalleryPage
