@@ -3,7 +3,6 @@ window.Buffer = Buffer;
 import React, { useState, useEffect, useContext, useRef, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { WalletContext } from '../contexts/WalletContext.jsx';
-import './HomePage_nature_final.css'; // <-- CORRECT, FINAL CSS IMPORT
 
 import IWasThereABI from '../abis/IWasThere.json';
 import ERC20ABI_file from '../abis/ERC20.json';
@@ -30,6 +29,7 @@ function HomePage() {
     const [selectedFiles, setSelectedFiles] = useState([]);
     const [isFreeMintAvailable, setIsFreeMintAvailable] = useState(false);
     const [latestTxHash, setLatestTxHash] = useState('');
+    const [description, setDescription] = useState(''); // <-- State for the description
     
     const fileInputRef = useRef(null);
 
@@ -75,7 +75,6 @@ function HomePage() {
                 setFeedback("Could not fetch contract data.");
             }
         };
-
         fetchData();
         if (account) {
             checkFreeMint();
@@ -105,7 +104,7 @@ function HomePage() {
             return;
         }
         setSelectedFiles(files);
-        setFeedback("Files selected. Ready to Chronicle.");
+        setFeedback("Files selected. Add a note and you're ready to Chronicle.");
         setLatestTxHash('');
     }, []);
 
@@ -132,7 +131,13 @@ function HomePage() {
             const processMintResponse = await fetch('/.netlify/functions/processMint', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ files: filesData, walletAddress: account, signature, isFreeMint: isFreeMintAvailable }),
+                body: JSON.stringify({ 
+                    files: filesData, 
+                    walletAddress: account, 
+                    signature, 
+                    isFreeMint: isFreeMintAvailable,
+                    description: description // <-- Send the description to the backend
+                }),
             });
             const processMintResult = await processMintResponse.json();
             if (!processMintResponse.ok) { throw new Error(processMintResult.error || "Backend process failed."); }
@@ -159,6 +164,7 @@ function HomePage() {
                 setLatestTxHash(mintTx.hash);
             }
             setSelectedFiles([]);
+            setDescription(''); // <-- Clear description on success
             if (fileInputRef.current) fileInputRef.current.value = "";
             setMintedCount(prev => prev + 1);
             checkFreeMint();
@@ -167,7 +173,7 @@ function HomePage() {
         } finally {
             setIsLoading(false);
         }
-    }, [account, signer, selectedFiles, isFreeMintAvailable, checkFreeMint]);
+    }, [account, signer, selectedFiles, isFreeMintAvailable, checkFreeMint, description]); // <-- Add description to dependencies
 
     const mintButtonText = () => {
         if (isLoading) return "Processing...";
@@ -176,58 +182,69 @@ function HomePage() {
     };
 
     return (
-        <div className="homepage-main-container">
-            <div className="mint-card">
-                <h1 className="card-title">Chronicle Your Moment</h1>
-                <p className="card-subtitle">Immortalize up to {MAX_PHOTOS_PER_BUNDLE} photos and {MAX_VIDEOS_PER_BUNDLE} videos (max {MAX_TOTAL_FILE_SIZE_MB}MB total).</p>
-                
-                <div className="supply-info">
-                    {maxSupply > 0 ? `${mintedCount.toLocaleString()} / ${maxSupply.toLocaleString()} CHRONICLED` : "Loading..."}
+        <div className="w-full max-w-lg p-10 space-y-6 bg-cream/25 backdrop-blur-2xl rounded-2xl shadow-2xl border border-warm-brown/30 hover:shadow-terracotta/40 hover:-translate-y-1 transition-all duration-300">
+            <div className="text-center">
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-forest-green via-sage-green to-warm-brown text-transparent bg-clip-text">Chronicle Your Moment</h1>
+                <p className="mt-2 text-warm-brown/90">Immortalize your memories on the blockchain. Forever.</p>
+            </div>
+
+            <div className="flex justify-around p-4 bg-cream/20 rounded-xl border border-golden-yellow/30">
+                <div className="text-center">
+                    <span className="text-sm text-warm-brown/80 uppercase tracking-wider">Minted</span>
+                    <p className="text-2xl font-bold text-warm-brown">{maxSupply > 0 ? `${mintedCount.toLocaleString()} / ${maxSupply.toLocaleString()}` : "..."}</p>
                 </div>
-                <div className="price-info">
-                    { !account ? `Price: ${PAID_MINT_PRICE_USDC} USDC per bundle` : isFreeMintAvailable ? "Price: FREE (1-time offer!)" : `Price: ${PAID_MINT_PRICE_USDC} USDC per bundle` }
+                <div className="text-center">
+                    <span className="text-sm text-warm-brown/80 uppercase tracking-wider">Price</span>
+                    <p className="text-2xl font-bold text-warm-brown">{!account ? `${PAID_MINT_PRICE_USDC} USDC` : isFreeMintAvailable ? "FREE!" : `${PAID_MINT_PRICE_USDC} USDC`}</p>
                 </div>
-                
-                {!account ? (
-                    <button onClick={connectWallet} disabled={isConnecting} className="action-button connect-button">
-                        {isConnecting ? "Connecting..." : "Connect Wallet"}
-                    </button>
-                ) : (
-                    <>
-                        <div className="file-upload-section" onClick={triggerFileSelect}>
-                            <input type="file" multiple accept="image/*,video/*" onChange={handleFileChange} ref={fileInputRef} className="file-input" />
-                            {selectedFiles.length === 0 ? (
-                                <div className="file-prompt-text">
-                                    Click or drag files here
-                                </div>
-                            ) : (
-                                <div className="selected-files-details">
-                                    <p>{selectedFiles.length} file(s) selected</p>
-                                    <p className="size-tracker">
-                                        Total Size: <strong>{(selectedFiles.reduce((s, f) => s + f.size, 0) / 1024 / 1024).toFixed(2)} MB / {MAX_TOTAL_FILE_SIZE_MB} MB</strong>
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                        
-                        {selectedFiles.length > 0 && (
-                            <button onClick={handleMint} disabled={isLoading} className="action-button mint-button">
+            </div>
+            
+            {!account ? (
+                <button onClick={connectWallet} disabled={isConnecting} className="w-full px-4 py-3 font-bold text-cream bg-gradient-to-r from-terracotta to-warm-brown rounded-lg">
+                    {isConnecting ? "Connecting..." : "Connect Wallet"}
+                </button>
+            ) : (
+                <div className="space-y-4">
+                    <div onClick={triggerFileSelect} className="flex flex-col items-center justify-center w-full p-6 border-2 border-dashed border-warm-brown/40 rounded-lg cursor-pointer hover:border-golden-yellow/60">
+                        <input type="file" multiple accept="image/*,video/*" onChange={handleFileChange} ref={fileInputRef} className="hidden" />
+                        {selectedFiles.length === 0 ? (
+                            <div className="text-center text-warm-brown/70">
+                                <span className="text-4xl opacity-50">🌿</span>
+                                <p className="font-semibold">Click or drag files here</p>
+                            </div>
+                        ) : (
+                            <div className="text-center text-warm-brown/90">
+                                <p className="font-semibold">{selectedFiles.length} file(s) selected</p>
+                                <p className="text-sm font-bold text-golden-yellow">Total Size: {(selectedFiles.reduce((s, f) => s + f.size, 0) / 1024 / 1024).toFixed(2)} MB</p>
+                            </div>
+                        )}
+                    </div>
+                    
+                    {selectedFiles.length > 0 && (
+                        <>
+                            <textarea
+                                className="w-full p-3 bg-cream/20 rounded-lg border border-warm-brown/30 text-warm-brown/90 placeholder-warm-brown/50 focus:ring-2 focus:ring-golden-yellow focus:outline-none transition"
+                                rows="3"
+                                placeholder="Add a note or description to your Chronicle..."
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                            />
+                            <button onClick={handleMint} disabled={isLoading} className="w-full px-4 py-3 font-bold text-cream bg-gradient-to-r from-sage-green to-forest-green rounded-lg">
                                 {mintButtonText()}
                             </button>
-                        )}
-                    </>
-                )}
-                
-                <p className={feedback.startsWith('Error:') ? "feedback-text" : "status-text"}>{feedback}</p>
-                
-                {latestTxHash && (
-                    <div className="tx-link">
-                        <a href={`https://polygonscan.com/tx/${latestTxHash}`} target="_blank" rel="noopener noreferrer">
-                            View Transaction on PolygonScan
-                        </a>
-                    </div>
-                )}
-            </div>
+                        </>
+                    )}
+                </div>
+            )}
+            
+            {feedback && <p className="mt-4 text-center text-sm text-warm-brown/80 min-h-[20px]">{feedback}</p>}
+            {latestTxHash && (
+                <div className="mt-4 text-center text-sm">
+                    <a href={`https://polygonscan.com/tx/${latestTxHash}`} target="_blank" rel="noopener noreferrer" className="font-semibold text-sage-green hover:text-forest-green">
+                        View Transaction
+                    </a>
+                </div>
+            )}
         </div>
     );
 }
