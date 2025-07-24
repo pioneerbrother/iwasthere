@@ -15,7 +15,7 @@ const PINATA_GATEWAY = 'https://gateway.pinata.cloud/ipfs/';
 const IWAS_THERE_ABI_MINIMAL = [ "function mintFree(address to, string memory _tokenURI)" ];
 
 exports.handler = async function(event, context) {
-    console.log("--- processMint function invoked (v5 Final) ---");
+    console.log("--- processMint function invoked (v6 Parallel) ---");
 
     try {
         if (event.httpMethod !== 'POST') {
@@ -43,8 +43,12 @@ exports.handler = async function(event, context) {
             }
         }
 
-        const mediaItems = [];
-        for (const fileData of files) {
+        // --- THIS IS THE FIX ---
+        // We now upload all files to Pinata in parallel to avoid the 10-second timeout.
+
+        console.log(`Starting parallel upload of ${files.length} files...`);
+
+        const uploadPromises = files.map(fileData => {
             const fileBuffer = Buffer.from(fileData.fileContentBase64, 'base64');
             const formData = new FormData();
             formData.append('file', fileBuffer, { filename: fileData.fileName, contentType: fileData.fileType });
@@ -55,24 +59,30 @@ exports.handler = async function(event, context) {
             });
             formData.append('pinataMetadata', pinataMetadata);
 
-            const pinataFileRes = await fetch(PINATA_API_URL, {
+            return fetch(PINATA_API_URL, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${PINATA_JWT}`, ...formData.getHeaders() },
                 body: formData
-            });
-
-            if (!pinataFileRes.ok) {
-                const errorText = await pinataFileRes.text();
-                throw new Error(`Pinata file upload failed: ${errorText}`);
-            }
-            const fileResult = await pinataFileRes.json();
-            mediaItems.push({
+            }).then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(`Pinata file upload failed for ${fileData.fileName}: ${text}`);
+                    });
+                }
+                return response.json();
+            }).then(fileResult => ({
                 cid: fileResult.IpfsHash,
                 fileName: fileData.fileName,
                 fileType: fileData.fileType,
                 gatewayUrl: `${PINATA_GATEWAY}${fileResult.IpfsHash}`
-            });
-        }
+            }));
+        });
+        
+        // await Promise.all() waits for all the uploads to complete.
+        const mediaItems = await Promise.all(uploadPromises);
+
+        console.log("All files uploaded successfully.");
+        // --- END OF FIX ---
         
         const nftMetadata = {
             name: title || `Chronicle Bundle by ${walletAddress}`,
