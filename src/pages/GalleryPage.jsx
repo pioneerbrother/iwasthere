@@ -45,7 +45,10 @@ function GalleryPage() {
                 if (!response.ok) {
                     throw new Error(`Failed to fetch NFTs (status: ${response.status})`);
                 }
-                const data = await response.json();
+                c// --- DIAGNOSTIC LOGGING ---
+console.log("RAW ALCHEMY API RESPONSE:", JSON.stringify(data, null, 2));
+// --- END DIAGNOSTIC LOGGING ---onst data = await response.json();
+
                 
                 // This logic correctly finds the full media array in the metadata
                 const formattedNfts = data.ownedNfts
