@@ -6,9 +6,14 @@ const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY;
 const IWT_CONTRACT_ADDRESS = import.meta.env.VITE_IWAS_THERE_NFT_ADDRESS;
 const ALCHEMY_URL = `https://polygon-mainnet.g.alchemy.com/nft/v3/${ALCHEMY_API_KEY}/getNFTsForOwner`;
 
+// A robust function to always use the reliable Pinata gateway
 const formatIpfsUrl = (url) => {
     if (!url) return '';
-    return url.replace(/^ipfs:\/\//, 'https://gateway.pinata.cloud/ipfs/').replace('ipfs.io', 'gateway.pinata.cloud');
+    if (url.startsWith('ipfs://')) {
+        return `https://gateway.pinata.cloud/ipfs/${url.substring(7)}`;
+    }
+    // Replace other common gateways just in case
+    return url.replace('ipfs.io', 'gateway.pinata.cloud');
 };
 
 function GalleryPage() {
@@ -19,18 +24,31 @@ function GalleryPage() {
 
     useEffect(() => {
         const fetchNfts = async () => {
-            if (!account) { setNfts([]); return; }
+            if (!account) {
+                setNfts([]);
+                return;
+            }
+            if (!ALCHEMY_API_KEY || !IWT_CONTRACT_ADDRESS) {
+                setError("Configuration error: Missing API Key or Contract Address.");
+                return;
+            }
+
             setIsLoading(true);
             setError('');
+            setNfts([]);
+
             try {
                 const response = await fetch(`${ALCHEMY_URL}?owner=${account}&contractAddresses[]=${IWT_CONTRACT_ADDRESS}&withMetadata=true`);
-                if (!response.ok) throw new Error('Failed to fetch NFTs from Alchemy.');
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch NFTs. Status: ${response.status}`);
+                }
+
                 const data = await response.json();
                 
                 const formattedNfts = data.ownedNfts
                     .filter(nft => nft.raw?.metadata?.properties?.media)
                     .map(nft => {
-                        // --- DEBUG LOG to verify the data ---
                         console.log(`Processing Token ID #${nft.tokenId}, Media count:`, nft.raw.metadata.properties.media.length);
                         
                         return {
@@ -40,21 +58,23 @@ function GalleryPage() {
                             media: nft.raw.metadata.properties.media.map(item => ({
                                 ...item,
                                 gatewayUrl: formatIpfsUrl(item.gatewayUrl || `ipfs://${item.cid}`)
-                            })) || [], 
+                            })) || [],
                         };
                     });
 
-                setNfts(formattedNfts.reverse());
+                setNfts(formattedNfts.reverse()); // Show newest first
                 if (formattedNfts.length === 0) {
-                    setError("You don't own any Chronicles yet, or the metadata is still loading.");
+                    setError("You don't own any 'I Was There' Chronicles yet, or the metadata is still loading.");
                 }
+
             } catch (err) {
                 console.error("Error fetching or processing NFTs:", err);
-                setError(err.message);
+                setError(err.message || "An error occurred while fetching your Chronicles.");
             } finally {
                 setIsLoading(false);
             }
         };
+
         fetchNfts();
     }, [account]);
 

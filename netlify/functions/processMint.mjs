@@ -3,6 +3,7 @@ const FormData = require('form-data');
 const { ethers } = require('ethers');
 const { getStore } = require("@netlify/blobs");
 
+// Environment variables are loaded by Netlify
 const PINATA_JWT = process.env.PINATA_JWT;
 const OWNER_PRIVATE_KEY_FOR_FREE_MINTS = process.env.OWNER_PRIVATE_KEY_FOR_FREE_MINTS;
 const IWAS_THERE_NFT_ADDRESS = process.env.IWAS_THERE_NFT_ADDRESS;
@@ -48,8 +49,6 @@ exports.handler = async function(event, context) {
             const formData = new FormData();
             formData.append('file', fileBuffer, { filename: fileData.fileName, contentType: fileData.fileType });
 
-            // --- THIS IS THE KEY FIX ---
-            // Add pinataMetadata for better file management and API compatibility
             const pinataMetadata = JSON.stringify({
                 name: fileData.fileName,
                 keyvalues: {
@@ -87,11 +86,10 @@ exports.handler = async function(event, context) {
 
         const metadataBuffer = Buffer.from(JSON.stringify(nftMetadata));
         const metadataFormData = new FormData();
-        metadataFormData.append('file', metadataBuffer, { filename: 'metadata.json' });
+        metadataFormData.append('file', metadataBuffer, { filename: 'metadata.json', contentType: 'application/json' });
         
-        // Add metadata for the metadata file itself
         const pinataMetadataForJson = JSON.stringify({
-            name: `metadata_${walletAddress}_${Date.now()}.json`,
+            name: `metadata_${walletAddress.slice(0, 6)}_${Date.now()}.json`,
             keyvalues: {
                 uploader: walletAddress
             }
@@ -119,7 +117,7 @@ exports.handler = async function(event, context) {
             const iWasThereContract = new ethers.Contract(IWAS_THERE_NFT_ADDRESS, IWAS_THERE_ABI_MINIMAL, ownerWallet);
 
             const tx = await iWasThereContract.mintFree(walletAddress, `ipfs://${metadataCID}`);
-            await tx.wait();
+            // DO NOT await tx.wait(); // Fire and Forget
 
             await freeMintStore.set(walletAddress.toLowerCase(), "used");
 
