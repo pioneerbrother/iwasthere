@@ -3,7 +3,7 @@ window.Buffer = Buffer;
 import React, { useState, useEffect, useContext, useRef, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { WalletContext } from '../contexts/WalletContext.jsx';
-import './HomePage.css';
+import './HomePage_nature_final.css';
 
 import IWasThereABI from '../abis/IWasThere.json';
 import ERC20ABI_file from '../abis/ERC20.json';
