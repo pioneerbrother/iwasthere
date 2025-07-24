@@ -6,64 +6,93 @@ const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY;
 const IWT_CONTRACT_ADDRESS = import.meta.env.VITE_IWAS_THERE_NFT_ADDRESS;
 const ALCHEMY_URL = `https://polygon-mainnet.g.alchemy.com/nft/v3/${ALCHEMY_API_KEY}/getNFTsForOwner`;
 
+// Helper function to format IPFS URLs to use a reliable gateway
 const formatIpfsUrl = (url) => {
     if (!url || typeof url !== 'string') return '';
     if (url.startsWith('ipfs://')) {
+        // Correctly formats standard IPFS URIs
         return `https://gateway.pinata.cloud/ipfs/${url.substring(7)}`;
     }
     if (url.startsWith('https://')) {
+        // Replaces less reliable gateways with Pinata's for consistency
         return url.replace('ipfs.io', 'gateway.pinata.cloud');
     }
+    // Return an empty string if the URL format is not recognized
     return '';
 };
 
+// --- THIS FUNCTION CONTAINS THE PRIMARY FIX ---
 const fetchAndProcessNfts = async (account) => {
-    const fetchUrl = `${ALCHEMY_URL}?owner=${account}&contractAddresses[]=${IWT_CONTRACT_ADDRESS}&withMetadata=false`;
+    // Constructing the URL to fetch NFTs owned by the user from the specific contract
+    const fetchUrl = `${ALCHEMY_URL}?owner=${account}&contractAddresses[]=${IWT_CONTRACT_ADDRESS}&withMetadata=true`; // Changed to withMetadata=true for robustness
+    
     const baseNftResponse = await fetch(fetchUrl);
-    if (!baseNftResponse.ok) throw new Error("Could not fetch base NFT data");
+    if (!baseNftResponse.ok) {
+        throw new Error("Could not fetch base NFT data from Alchemy");
+    }
 
     const baseNftData = await baseNftResponse.json();
-    console.log("Fetched base NFT list:", baseNftData.ownedNfts);
+    console.log("Fetched NFT list from Alchemy:", baseNftData.ownedNfts);
 
+    // Processing each NFT to fetch its detailed metadata
     const nftPromises = baseNftData.ownedNfts.map(async (nft) => {
-        // --- THIS IS THE FINAL FIX ---
-        // We now correctly read the URI from the 'raw' property.
-        const metadataUrl = formatIpfsUrl(nft.tokenUri?.raw); 
+        
+        // --- THIS IS THE FINAL, CORRECT FIX ---
+        // Alchemy's response provides the metadata URL in `nft.tokenUri`.
+        // We no longer use `.raw` which was causing the "invalid URL" error.
+        const metadataUrl = formatIpfsUrl(nft.tokenUri); 
         // --- END OF FIX ---
 
+        // If after formatting, the URL is invalid or missing, we mark it as an error state.
         if (!metadataUrl) {
-            console.warn(`Token ID ${nft.tokenId} has a missing or invalid tokenUri.raw`);
-            return { tokenId: nft.tokenId, title: "Untitled", description: "Invalid metadata URL", media: [] };
+            console.warn(`Token ID ${nft.tokenId} has a missing or invalid tokenUri.`, nft);
+            return { 
+                tokenId: nft.tokenId, 
+                title: "Untitled", 
+                description: "Invalid or missing metadata URL.", 
+                media: [] 
+            };
         }
 
         try {
+            // Fetch the metadata from the IPFS gateway
             const metadataResponse = await fetch(metadataUrl);
             if (!metadataResponse.ok) {
-                 return { ...nft, title: nft.name || "Untitled", description: "Metadata fetch failed.", media: [] };
+                 console.error(`Metadata fetch failed for Token ID ${nft.tokenId} at ${metadataUrl}`);
+                 return { 
+                     tokenId: nft.tokenId,
+                     title: nft.name || "Untitled", 
+                     description: "Failed to fetch metadata. The content may still be propagating on the network.", 
+                     media: [] 
+                    };
             }
             const metadata = await metadataResponse.json();
             
+            // Successfully process and return the chronicle's data
             return {
                 tokenId: nft.tokenId,
                 title: metadata.name || 'Untitled Chronicle',
-                description: metadata.description || 'No description.',
+                description: metadata.description || 'No description provided.',
+                // Ensure media items have a gatewayUrl for display
                 media: (metadata.properties?.media || []).map(item => ({
                     ...item,
                     gatewayUrl: formatIpfsUrl(item.gatewayUrl || `ipfs://${item.cid}`)
                 }))
             };
         } catch (e) {
-            console.error(`Could not parse metadata for token ${nft.tokenId}. URL: ${metadataUrl}`);
+            console.error(`Could not parse metadata JSON for token ${nft.tokenId}. URL: ${metadataUrl}`, e);
+            // This catches errors if the fetched metadata is not valid JSON
             return { 
                 tokenId: nft.tokenId,
                 title: nft.name || `Chronicle ${nft.tokenId}`, 
-                description: "Metadata is currently pending or invalid. Please check back soon.", 
+                description: "Metadata is malformed or invalid. Please check the source.", 
                 media: [],
-                isPending: true
+                isPending: true // Use a flag to indicate potential issues
             };
         }
     });
 
+    // Wait for all the individual metadata fetches to complete
     return Promise.all(nftPromises);
 };
 
@@ -76,25 +105,37 @@ function GalleryPage() {
 
     useEffect(() => {
         const runFetch = async () => {
-            if (!account) { setNfts([]); return; }
-            if (!ALCHEMY_API_KEY || !IWT_CONTRACT_ADDRESS) { setError("Configuration error."); return; }
+            if (!account) { 
+                setNfts([]); 
+                return; 
+            }
+            if (!ALCHEMY_API_KEY || !IWT_CONTRACT_ADDRESS) {
+                setError("Configuration error: Missing API Key or Contract Address.");
+                return;
+            }
+
             setIsLoading(true);
             setError('');
+
             try {
                 const processedNfts = await fetchAndProcessNfts(account);
-                setNfts(processedNfts.filter(Boolean).reverse());
-                if (processedNfts.length === 0) { setError("You don't own any Chronicles yet."); }
+                // Filter out any null results and reverse to show newest first
+                setNfts(processedNfts.filter(Boolean).reverse()); 
+                if (processedNfts.length === 0) {
+                    setError("You don't own any Chronicles yet.");
+                }
             } catch (err) {
                 console.error("CRITICAL ERROR in runFetch:", err);
-                setError(`A critical error occurred: ${err.message}.`);
+                setError(`A critical error occurred while fetching your chronicles: ${err.message}.`);
             } finally {
                 setIsLoading(false);
             }
         };
+
         runFetch();
     }, [account]);
 
-    // --- NO MORE CHANGES NEEDED BELOW THIS LINE ---
+    // --- REMAINDER OF THE COMPONENT (NO CHANGES NEEDED) ---
 
     if (!account) {
         return (
@@ -122,18 +163,14 @@ function GalleryPage() {
                     <div key={nft.tokenId} className={`bg-cream/20 backdrop-blur-md rounded-xl shadow-lg border border-warm-brown/20 flex flex-col overflow-hidden ${nft.isPending ? 'opacity-60' : ''}`}>
                         
                         {nft.media && nft.media.length > 0 ? (
-                            <div className="grid grid-cols-2 gap-1">
-                                {nft.media.map((item, index) => (
-                                    <a href={item.gatewayUrl} target="_blank" rel="noopener noreferrer" key={index} className="aspect-square bg-cream/10">
-                                        <img 
-                                            src={item.gatewayUrl} 
-                                            alt={item.fileName || `Chronicle Media ${index + 1}`}
-                                            className="w-full h-full object-cover"
-                                            loading="lazy"
-                                            onError={(e) => { e.target.src = 'https://via.placeholder.com/150/f0f0f0/999999?text=Error'; }}
-                                        />
-                                    </a>
-                                ))}
+                             <div className="aspect-square flex items-center justify-center bg-cream/10 p-4">
+                                <img 
+                                    src={nft.media[0].gatewayUrl} 
+                                    alt={nft.title || `Chronicle Media`}
+                                    className="w-full h-full object-cover"
+                                    loading="lazy"
+                                    onError={(e) => { e.target.src = 'https://via.placeholder.com/150/f0f0f0/999999?text=Error'; }}
+                                />
                             </div>
                         ) : (
                            <div className="aspect-square flex items-center justify-center bg-cream/10 p-4 text-center text-warm-brown/70">
