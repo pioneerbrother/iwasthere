@@ -6,13 +6,13 @@ const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY;
 const IWT_CONTRACT_ADDRESS = import.meta.env.VITE_IWAS_THERE_NFT_ADDRESS;
 const ALCHEMY_URL = `https://polygon-mainnet.g.alchemy.com/nft/v3/${ALCHEMY_API_KEY}/getNFTsForOwner`;
 
-// A robust function to always use the reliable Pinata gateway for all images
+// A robust function to always use a reliable gateway
 const formatIpfsUrl = (url) => {
     if (!url) return '';
     if (url.startsWith('ipfs://')) {
         return `https://gateway.pinata.cloud/ipfs/${url.substring(7)}`;
     }
-    // This handles older URLs that might have used a different gateway
+    // Handles cases where a different gateway might have been used
     return url.replace('ipfs.io', 'gateway.pinata.cloud');
 };
 
@@ -38,12 +38,16 @@ function GalleryPage() {
             setNfts([]);
 
             try {
-                const response = await fetch(`${ALCHEMY_URL}?owner=${account}&contractAddresses[]=${IWT_CONTRACT_ADDRESS}&withMetadata=true`);
+                // Added a cache-busting parameter to ensure we get the latest metadata from Alchemy
+                const fetchUrl = `${ALCHEMY_URL}?owner=${account}&contractAddresses[]=${IWT_CONTRACT_ADDRESS}&withMetadata=true&refreshCache=true`;
+                const response = await fetch(fetchUrl);
+                
                 if (!response.ok) {
                     throw new Error(`Failed to fetch NFTs (status: ${response.status})`);
                 }
                 const data = await response.json();
                 
+                // This logic correctly finds the full media array in the metadata
                 const formattedNfts = data.ownedNfts
                     .filter(nft => nft.raw?.metadata?.properties?.media && Array.isArray(nft.raw.metadata.properties.media))
                     .map(nft => {
@@ -58,14 +62,14 @@ function GalleryPage() {
                         };
                     });
 
-                setNfts(formattedNfts.reverse());
+                setNfts(formattedNfts.reverse()); // Show newest chronicles first
                 if (formattedNfts.length === 0) {
-                    setError("You don't own any Chronicles yet, or the metadata is still loading.");
+                    setError("You don't own any Chronicles yet, or the metadata is still loading. Please check back in a moment.");
                 }
 
             } catch (err) {
                 console.error("Error fetching or processing NFTs:", err);
-                setError(err.message);
+                setError(`An error occurred: ${err.message}. The chain data might be syncing.`);
             } finally {
                 setIsLoading(false);
             }
@@ -91,23 +95,25 @@ function GalleryPage() {
         <div className="w-full max-w-6xl mx-auto px-4">
             <h1 className="text-4xl font-bold text-warm-brown text-center mb-8">My Chronicles</h1>
             
-            {isLoading && <div className="text-center text-warm-brown">Loading...</div>}
+            {isLoading && <div className="text-center text-warm-brown">Loading your chronicles...</div>}
             {error && <div className="text-center text-red-600 bg-red-100 p-4 rounded-lg">{error}</div>}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {nfts.map(nft => (
                     <div key={nft.tokenId} className="bg-cream/20 backdrop-blur-md rounded-xl shadow-lg border border-warm-brown/20 flex flex-col overflow-hidden">
                         
-                        {/* --- CORRECTED MEDIA GRID --- */}
-                        {/* This grid now maps all media items and is flexible, removing the 4-item limit */}
+                        {/* --- THIS IS THE FIX --- */}
+                        {/* This flexible grid maps over ALL media items and displays them. */}
                         <div className="grid grid-cols-2 gap-1">
                             {nft.media.map((item, index) => (
-                                <a href={item.gatewayUrl} target="_blank" rel="noopener noreferrer" key={index}>
+                                <a href={item.gatewayUrl} target="_blank" rel="noopener noreferrer" key={index} className="aspect-square bg-cream/10">
                                     <img 
                                         src={item.gatewayUrl} 
-                                        alt={item.fileName || 'Chronicle Media'} 
-                                        className="w-full h-full object-cover aspect-square" // aspect-square keeps the grid tidy
-                                        onError={(e) => { e.target.parentElement.style.display = 'none'; }} // Hide parent link on error
+                                        alt={item.fileName || `Chronicle Media ${index + 1}`}
+                                        className="w-full h-full object-cover"
+                                        loading="lazy"
+                                        // Display a placeholder if an image fails to load
+                                        onError={(e) => { e.target.src = 'https://via.placeholder.com/150/f0f0f0/999999?text=Error'; }}
                                     />
                                 </a>
                             ))}
