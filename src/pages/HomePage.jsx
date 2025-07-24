@@ -148,7 +148,11 @@ function HomePage() {
                 setFeedback("🎉 Success! Your FREE mint was submitted.");
                 setLatestTxHash(processMintResult.transactionHash);
             } else {
-                const ipfsMetadataCid = `ipfs://${processMintResult.metadataCID}`;
+               const metadataCID = processMintResult.metadataCID;
+               // CRITICAL VALIDATION: Check if we got a valid CID from the backend
+    if (!metadataCID || !metadataCID.startsWith('Qm')) {
+        throw new Error(`Failed to get a valid metadata CID from the backend. Response: ${JSON.stringify(processMintResult)}`);
+    }           const ipfsMetadataCid = `ipfs://${metadataCID}`;
                 setFeedback("Approving USDC...");
                 const iWasThereContract = new ethers.Contract(iWasThereNFTAddress, IWasThereABI, signer);
                 const usdcContract = new ethers.Contract(usdcAddress, ERC20ABI, signer);
@@ -158,6 +162,7 @@ function HomePage() {
                     const approveTx = await usdcContract.approve(iWasThereContract.address, contractMintPrice);
                     await approveTx.wait(1);
                 }
+                  console.log(`Minting paid token for ${account} with URI: ${ipfsMetadataCid}`); // Add logging
                 const mintTx = await iWasThereContract.mint(account, ipfsMetadataCid);
                 await mintTx.wait(1);
                 setFeedback("🎉 Success! Your Chronicle is on the blockchain!");
