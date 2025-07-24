@@ -6,17 +6,14 @@ const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY;
 const IWT_CONTRACT_ADDRESS = import.meta.env.VITE_IWAS_THERE_NFT_ADDRESS;
 const ALCHEMY_URL = `https://polygon-mainnet.g.alchemy.com/nft/v3/${ALCHEMY_API_KEY}/getNFTsForOwner`;
 
-// A robust function to always use the reliable Pinata gateway
+// A robust function to always use a reliable IPFS gateway
 const formatIpfsUrl = (url ) => {
     if (!url) return '';
-    // Handle Pinata's gateway format which might already be correct
-    if (url.includes('gateway.pinata.cloud')) {
-        return url;
-    }
     if (url.startsWith('ipfs://')) {
+        // Convert ipfs:// URI to a full gateway URL
         return `https://gateway.pinata.cloud/ipfs/${url.substring(7 )}`;
     }
-    // Replace other common gateways just in case
+    // If it's already a URL, ensure it uses a reliable gateway
     return url.replace('ipfs.io', 'gateway.pinata.cloud');
 };
 
@@ -50,13 +47,16 @@ function GalleryPage() {
 
                 const data = await response.json();
                 
+                // --- THIS IS THE KEY FIX ---
                 const formattedNfts = data.ownedNfts
-                    .filter(nft => nft.raw?.metadata?.properties?.media)
                     .map(nft => {
-                        console.log(`Processing Token ID #${nft.tokenId}, Media count:`, nft.raw.metadata.properties.media.length);
+                        // 1. Safely access the media array from the metadata properties
+                        const mediaArray = nft.raw?.metadata?.properties?.media || [];
                         
-                        // Correctly map all media items
-                        const allMedia = nft.raw.metadata.properties.media.map(item => ({
+                        console.log(`Processing Token ID #${nft.tokenId}, Media count:`, mediaArray.length);
+                        
+                        // 2. Ensure every item in the media array has a valid gatewayUrl
+                        const processedMedia = mediaArray.map(item => ({
                             ...item,
                             gatewayUrl: formatIpfsUrl(item.gatewayUrl || `ipfs://${item.cid}`)
                         }));
@@ -65,9 +65,11 @@ function GalleryPage() {
                             tokenId: nft.tokenId,
                             title: nft.name || 'Untitled Chronicle',
                             description: nft.description || 'No description provided.',
-                            media: allMedia, // Use the fully mapped array
+                            media: processedMedia, // 3. Assign the fully processed array
                         };
-                    });
+                    })
+                    // Filter out any NFTs that didn't have valid media properties
+                    .filter(nft => nft.media.length > 0);
 
                 setNfts(formattedNfts.reverse()); // Show newest first
                 if (formattedNfts.length === 0) {
@@ -84,6 +86,9 @@ function GalleryPage() {
 
         fetchNfts();
     }, [account]);
+
+    // The rest of the component remains the same, as the rendering logic was already correct.
+    // The problem was the data being fed into it.
 
     if (!account) {
         return (
@@ -142,7 +147,7 @@ function GalleryPage() {
                                 </div>
                             ))}
                             
-                            {/* Render placeholders for empty slots */}
+                            {/* Render placeholders for the remaining empty slots */}
                             {Array.from({ length: Math.max(0, 4 - nft.media.length) }).map((_, i) => (
                                 <div key={`placeholder-${i}`} className="bg-cream/10 flex items-center justify-center">
                                     <div className="text-warm-brown/40 text-xs">No Image</div>
