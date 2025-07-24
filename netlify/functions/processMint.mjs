@@ -2,23 +2,23 @@ const fetch = require('node-fetch');
 const FormData = require('form-data');
 const { ethers } = require('ethers');
 const { getStore } = require("@netlify/blobs");
+const { Buffer } = require('buffer'); // <-- Explicitly require Buffer
 
-// ... (all your environment variables and constants are correct) ...
 const PINATA_JWT = process.env.PINATA_JWT;
 const OWNER_PRIVATE_KEY_FOR_FREE_MINTS = process.env.OWNER_PRIVATE_KEY_FOR_FREE_MINTS;
 const IWAS_THERE_NFT_ADDRESS = process.env.IWAS_THERE_NFT_ADDRESS;
 const POLYGON_RPC_URL = process.env.POLYGON_RPC_URL;
+
 const PINATA_API_URL = 'https://api.pinata.cloud/pinning/pinFileToIPFS';
 const PINATA_GATEWAY = 'https://gateway.pinata.cloud/ipfs/';
-const IWAS_THERE_ABI_MINIMAL = [ "function mintFree(address to, string memory _tokenURI )" ];
 
+const IWAS_THERE_ABI_MINIMAL = [ "function mintFree(address to, string memory _tokenURI)" ];
 
 exports.handler = async function(event, context) {
     console.log("--- processMint function invoked (Definitive Final Version) ---");
 
     try {
-        // ... (The entire 'try' block from the previous correct version remains unchanged) ...
-        if (event.httpMethod !== 'POST' ) {
+        if (event.httpMethod !== 'POST') {
             return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
         }
         
@@ -97,6 +97,7 @@ exports.handler = async function(event, context) {
             const ownerWallet = new ethers.Wallet(OWNER_PRIVATE_KEY_FOR_FREE_MINTS, provider);
             const iWasThereContract = new ethers.Contract(IWAS_THERE_NFT_ADDRESS, IWAS_THERE_ABI_MINIMAL, ownerWallet);
             const tx = await iWasThereContract.mintFree(walletAddress, `ipfs://${metadataCID}`);
+            // Fire and Forget
             await freeMintStore.set(walletAddress.toLowerCase(), "used");
             return {
                 statusCode: 200,
@@ -116,14 +117,14 @@ exports.handler = async function(event, context) {
             };
         }
     } catch (error) {
-        // --- THIS IS THE ONLY CHANGE ---
+        // --- YOUR EXCELLENT LOGGING FIX ---
         // Log the entire error object for detailed debugging
         console.error("--- CRITICAL ERROR in processMint function ---", error); 
         
-        // Return a generic but valid JSON error message
+        // Return a valid JSON error message that includes the full error
         return { 
             statusCode: 500, 
-            body: JSON.stringify({ error: "An internal server error occurred. Check the function logs for details." }) 
+            body: JSON.stringify({ error: `Function crashed: ${error.toString()}` }) 
         };
     }
 };
