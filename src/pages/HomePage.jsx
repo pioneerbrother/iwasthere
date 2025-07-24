@@ -16,7 +16,10 @@ const POLYGON_MAINNET_CHAIN_ID = 137;
 
 const MAX_PHOTOS_PER_BUNDLE = 12;
 const MAX_VIDEOS_PER_BUNDLE = 2;
-const MAX_TOTAL_FILE_SIZE_MB = 75;
+// --- THIS IS THE FIX ---
+// The previous value of 75 was too large for the serverless function's 6MB payload limit.
+// 4MB is a safe limit that prevents the request from being truncated.
+const MAX_TOTAL_FILE_SIZE_MB = 4;
 const MAX_TOTAL_FILE_SIZE_BYTES = MAX_TOTAL_FILE_SIZE_MB * 1024 * 1024;
 const PAID_MINT_PRICE_USDC = 2;
 
