@@ -1,51 +1,57 @@
-// Located in your Netlify functions folder, e.g., /netlify/functions/processMint.js
-
+// Located in /netlify/functions/processMint.js
 const fetch = require('node-fetch');
 const FormData = require('form-data');
 const { ethers } = require('ethers');
 const { Buffer } = require('buffer');
 
 const PINATA_JWT = process.env.PINATA_JWT;
+const PINATA_API_URL = 'https://api.pinata.cloud/pinning/pinFileToIPFS';
+const PINATA_GATEWAY = 'https://gateway.pinata.cloud/ipfs/';
+const IWAS_THERE_ABI_MINIMAL = ["function mintFree(address to, string memory _tokenURI)"];
 const OWNER_PRIVATE_KEY_FOR_FREE_MINTS = process.env.OWNER_PRIVATE_KEY_FOR_FREE_MINTS;
 const IWAS_THERE_NFT_ADDRESS = process.env.IWAS_THERE_NFT_ADDRESS;
 const POLYGON_RPC_URL = process.env.POLYGON_RPC_URL;
 
-const PINATA_API_URL = 'https://api.pinata.cloud/pinning/pinFileToIPFS';
-const PINATA_GATEWAY = 'https://gateway.pinata.cloud/ipfs/';
-
-const IWAS_THERE_ABI_MINIMAL = [ "function mintFree(address to, string memory _tokenURI)" ];
 
 exports.handler = async function(event, context) {
-    console.log("--- processMint v8 (Robust Looping) Invoked ---");
+    console.log("--- processMint v10 (DEFINITIVE) Invoked ---");
 
     try {
         if (event.httpMethod !== 'POST') {
-            return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
+            return { statusCode: 405, body: 'Method Not Allowed' };
         }
         
-        const { files, walletAddress, signature, isFreeMint, title, description } = JSON.parse(event.body);
-        if (!files || !Array.isArray(files) || files.length === 0 || !walletAddress || !signature) {
-             throw new Error("Missing or malformed fields.");
+        // STEP 1: LOG THE RAW INCOMING DATA
+        console.log("Raw event body received:", event.body);
+        
+        const body = JSON.parse(event.body);
+        const { files, walletAddress, signature, isFreeMint, title, description } = body;
+
+        // STEP 2: VALIDATE THE INCOMING DATA
+        if (!Array.isArray(files) || files.length === 0 || !walletAddress || !signature) {
+             const errorMsg = `CRITICAL: Malformed request. Is files an array? ${Array.isArray(files)}. Files count: ${files?.length}. Wallet provided: ${!!walletAddress}.`;
+             console.error(errorMsg);
+             throw new Error(errorMsg);
         }
 
         const recoveredAddress = ethers.utils.verifyMessage(`ChronicleMe: Verifying access for ${walletAddress} to upload media and request mint.`, signature);
         if (recoveredAddress.toLowerCase() !== walletAddress.toLowerCase()) {
             throw new Error("Invalid wallet signature.");
         }
-        console.log(`Signature valid. Processing ${files.length} files for ${walletAddress}.`);
-
-        // --- THIS IS THE CRITICAL FIX ---
-        // Instead of Promise.all, we use a standard for...of loop to upload files one-by-one.
-        // This is more robust in a serverless environment and avoids potential race conditions or payload issues.
         
+        // STEP 3: LOG THE EXACT NUMBER OF FILES TO BE PROCESSED
+        console.log(`Signature valid. Starting processing for ${files.length} files.`);
+
         const mediaItems = [];
-        for (const fileData of files) {
-            console.log(`Uploading ${fileData.fileName}...`);
+        // Use a standard `for` loop for maximum safety in serverless environment
+        for (let i = 0; i < files.length; i++) {
+            const fileData = files[i];
+            console.log(`[LOOP ${i + 1}/${files.length}] Uploading ${fileData.fileName}...`);
+            
             const fileBuffer = Buffer.from(fileData.fileContentBase64, 'base64');
             const formData = new FormData();
             formData.append('file', fileBuffer, { filename: fileData.fileName, contentType: fileData.fileType });
-            formData.append('pinataMetadata', JSON.stringify({ name: fileData.fileName }));
-
+            
             const response = await fetch(PINATA_API_URL, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${PINATA_JWT}`, ...formData.getHeaders() },
@@ -54,7 +60,7 @@ exports.handler = async function(event, context) {
 
             if (!response.ok) {
                 const errorText = await response.text();
-                throw new Error(`Pinata upload failed for ${fileData.fileName}: ${errorText}`);
+                throw new Error(`Pinata upload failed inside loop for ${fileData.fileName}: ${errorText}`);
             }
 
             const result = await response.json();
@@ -64,20 +70,27 @@ exports.handler = async function(event, context) {
                 fileType: fileData.fileType,
                 gatewayUrl: `${PINATA_GATEWAY}${result.IpfsHash}`
             });
-            console.log(`...Success. CID: ${result.IpfsHash}`);
+            console.log(`[LOOP ${i + 1}/${files.length}] ...Success. CID: ${result.IpfsHash}`);
         }
-        // --- END OF CRITICAL FIX ---
         
-        console.log(`All ${mediaItems.length} files uploaded successfully.`);
+        // STEP 4: LOG THE FINAL COUNT OF PROCESSED FILES
+        console.log(`Loop finished. Total items processed into mediaItems array: ${mediaItems.length}`);
+
+        if (mediaItems.length !== files.length) {
+            const errorMsg = `CRITICAL MISMATCH: Should have processed ${files.length} files but only have ${mediaItems.length}.`;
+            console.error(errorMsg);
+            throw new Error(errorMsg);
+        }
 
         const nftMetadata = {
-            name: title || `Chronicle by ${walletAddress.slice(0,6)}`,
+            name: title || `Chronicle by ${walletAddress.slice(0,6)}...`,
             description: description || "A collection of memories chronicled on the blockchain.",
-            image: mediaItems[0]?.gatewayUrl || null, // Standard thumbnail
-            properties: { media: mediaItems } // Our custom property with ALL items
+            image: mediaItems[0]?.gatewayUrl || "",
+            properties: { media: mediaItems }
         };
 
-        console.log("Uploading final metadata.json...");
+        console.log("Uploading final metadata.json containing", mediaItems.length, "media items...");
+        
         const metadataBuffer = Buffer.from(JSON.stringify(nftMetadata));
         const metadataFormData = new FormData();
         metadataFormData.append('file', metadataBuffer, { filename: 'metadata.json' });
@@ -92,21 +105,19 @@ exports.handler = async function(event, context) {
         
         const metadataResult = await pinataMetadataRes.json();
         const metadataCID = metadataResult.IpfsHash;
-        if (!metadataCID) throw new Error("Metadata uploaded but Pinata did not return an IpfsHash.");
         
-        console.log(`Metadata uploaded. CID: ${metadataCID}`);
+        console.log(`Metadata upload successful. CID: ${metadataCID}`);
 
         if (isFreeMint) {
-            // Free mint logic remains the same
+            // Free mint logic here
         } else {
-            console.log("Returning metadata CID to frontend for paid mint.");
             return {
                 statusCode: 200,
                 body: JSON.stringify({ metadataCID, message: "Upload successful." })
             };
         }
     } catch (error) {
-        console.error("--- CRITICAL ERROR in processMint ---", error);
+        console.error("--- UNRECOVERABLE ERROR in processMint ---", error);
         return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
     }
 };
