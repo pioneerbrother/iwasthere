@@ -6,7 +6,6 @@ const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY;
 const IWT_CONTRACT_ADDRESS = import.meta.env.VITE_IWAS_THERE_NFT_ADDRESS;
 const ALCHEMY_URL = `https://polygon-mainnet.g.alchemy.com/nft/v3/${ALCHEMY_API_KEY}/getNFTsForOwner`;
 
-// This function now also handles cases where the URL might be malformed
 const formatIpfsUrl = (url) => {
     if (!url || typeof url !== 'string') return '';
     if (url.startsWith('ipfs://')) {
@@ -18,9 +17,8 @@ const formatIpfsUrl = (url) => {
     return '';
 };
 
-// --- THIS IS THE NEW, SMARTER FETCH LOGIC ---
 const fetchAndProcessNfts = async (account) => {
-    const fetchUrl = `${ALCHEMY_URL}?owner=${account}&contractAddresses[]=${IWT_CONTRACT_ADDRESS}&withMetadata=false`; // We set withMetadata to false initially
+    const fetchUrl = `${ALCHEMY_URL}?owner=${account}&contractAddresses[]=${IWT_CONTRACT_ADDRESS}&withMetadata=false`;
     const baseNftResponse = await fetch(fetchUrl);
     if (!baseNftResponse.ok) throw new Error("Could not fetch base NFT data");
 
@@ -28,9 +26,14 @@ const fetchAndProcessNfts = async (account) => {
     console.log("Fetched base NFT list:", baseNftData.ownedNfts);
 
     const nftPromises = baseNftData.ownedNfts.map(async (nft) => {
-        const metadataUrl = formatIpfsUrl(nft.tokenUri);
+        // --- THIS IS THE FINAL FIX ---
+        // We now correctly read the URI from the 'raw' property.
+        const metadataUrl = formatIpfsUrl(nft.tokenUri?.raw); 
+        // --- END OF FIX ---
+
         if (!metadataUrl) {
-            return { ...nft, title: nft.name || "Untitled", description: "Invalid metadata URL", media: [] };
+            console.warn(`Token ID ${nft.tokenId} has a missing or invalid tokenUri.raw`);
+            return { tokenId: nft.tokenId, title: "Untitled", description: "Invalid metadata URL", media: [] };
         }
 
         try {
@@ -38,28 +41,25 @@ const fetchAndProcessNfts = async (account) => {
             if (!metadataResponse.ok) {
                  return { ...nft, title: nft.name || "Untitled", description: "Metadata fetch failed.", media: [] };
             }
-            
-            const metadata = await metadataResponse.json(); // This will fail if the response is HTML
+            const metadata = await metadataResponse.json();
             
             return {
                 tokenId: nft.tokenId,
                 title: metadata.name || 'Untitled Chronicle',
                 description: metadata.description || 'No description.',
-                // The crucial part: we read the media array from the metadata we just fetched
                 media: (metadata.properties?.media || []).map(item => ({
                     ...item,
                     gatewayUrl: formatIpfsUrl(item.gatewayUrl || `ipfs://${item.cid}`)
                 }))
             };
         } catch (e) {
-            // This CATCH block is key. It handles the HTML error page.
-            console.error(`Could not parse metadata for token ${nft.tokenId}. It's likely pending or invalid. URL: ${metadataUrl}`);
+            console.error(`Could not parse metadata for token ${nft.tokenId}. URL: ${metadataUrl}`);
             return { 
                 tokenId: nft.tokenId,
                 title: nft.name || `Chronicle ${nft.tokenId}`, 
                 description: "Metadata is currently pending or invalid. Please check back soon.", 
                 media: [],
-                isPending: true // We can use this to show a different UI state if we want
+                isPending: true
             };
         }
     });
@@ -76,25 +76,14 @@ function GalleryPage() {
 
     useEffect(() => {
         const runFetch = async () => {
-            if (!account) {
-                setNfts([]);
-                return;
-            }
-            if (!ALCHEMY_API_KEY || !IWT_CONTRACT_ADDRESS) {
-                setError("Configuration error.");
-                return;
-            }
-
+            if (!account) { setNfts([]); return; }
+            if (!ALCHEMY_API_KEY || !IWT_CONTRACT_ADDRESS) { setError("Configuration error."); return; }
             setIsLoading(true);
             setError('');
-            
             try {
                 const processedNfts = await fetchAndProcessNfts(account);
-                // Filter out any NFTs that might have failed completely, then reverse to show newest first
                 setNfts(processedNfts.filter(Boolean).reverse());
-                if (processedNfts.length === 0) {
-                    setError("You don't own any Chronicles yet.");
-                }
+                if (processedNfts.length === 0) { setError("You don't own any Chronicles yet."); }
             } catch (err) {
                 console.error("CRITICAL ERROR in runFetch:", err);
                 setError(`A critical error occurred: ${err.message}.`);
@@ -105,7 +94,6 @@ function GalleryPage() {
         runFetch();
     }, [account]);
 
-    // ... The rest of your component's JSX remains largely the same ...
     // --- NO MORE CHANGES NEEDED BELOW THIS LINE ---
 
     if (!account) {
@@ -133,7 +121,6 @@ function GalleryPage() {
                 {nfts.map(nft => (
                     <div key={nft.tokenId} className={`bg-cream/20 backdrop-blur-md rounded-xl shadow-lg border border-warm-brown/20 flex flex-col overflow-hidden ${nft.isPending ? 'opacity-60' : ''}`}>
                         
-                        {/* This part now correctly displays the grid if media exists, or shows a message */}
                         {nft.media && nft.media.length > 0 ? (
                             <div className="grid grid-cols-2 gap-1">
                                 {nft.media.map((item, index) => (
@@ -161,7 +148,6 @@ function GalleryPage() {
                                 {nft.description}
                             </p>
                             
-                            {/* Only show the media list if there are items */}
                             {nft.media && nft.media.length > 0 && (
                                 <div className="mt-auto">
                                     <h3 className="font-semibold text-warm-brown mb-2">
