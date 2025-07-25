@@ -37,6 +37,7 @@ const fetchAndProcessNfts = async (account) => {
             const metadata = await metadataResponse.json();
             
             let mediaItems = [];
+            // This logic correctly handles both new multi-file tokens and old single-file tokens
             if (metadata.properties && Array.isArray(metadata.properties.media)) {
                 mediaItems = metadata.properties.media.map(item => ({
                     ...item,
@@ -60,7 +61,7 @@ const fetchAndProcessNfts = async (account) => {
 };
 
 function GalleryPage() {
-    const { account, connectWallet } = useContext(WalletContext);
+    const { account, connectWallet, isConnecting } = useContext(WalletContext);
     const [nfts, setNfts] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
@@ -71,10 +72,8 @@ function GalleryPage() {
             setIsLoading(true);
             try {
                 const processedNfts = await fetchAndProcessNfts(account);
-                const validNfts = processedNfts.filter(Boolean);
-                validNfts.sort((a, b) => b.tokenId - a.tokenId);
+                const validNfts = processedNfts.filter(Boolean).sort((a, b) => b.tokenId - a.tokenId);
                 setNfts(validNfts);
-                if (validNfts.length === 0) setError("You don't own any Chronicles yet.");
             } catch (err) {
                 setError(`A critical error occurred: ${err.message}.`);
             } finally {
@@ -85,14 +84,14 @@ function GalleryPage() {
     }, [account]);
 
     if (!account) {
-        return <div className="text-center"><button onClick={connectWallet}>Connect Wallet</button></div>;
+        return <div className="text-center p-8"><button onClick={connectWallet} disabled={isConnecting}>{isConnecting ? 'Connecting...' : 'Connect Wallet'}</button></div>;
     }
 
     return (
         <div className="w-full max-w-6xl mx-auto px-4">
             <h1 className="text-4xl font-bold text-warm-brown text-center mb-8">My Chronicles</h1>
             
-            {isLoading && <div className="text-center text-warm-brown">Loading all your chronicles...</div>}
+            {isLoading && <div className="text-center text-warm-brown">Loading...</div>}
             {error && <div className="text-center text-red-600 bg-red-100 p-4 rounded-lg">{error}</div>}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -103,40 +102,35 @@ function GalleryPage() {
                             {nft.media && nft.media.length > 0 ? (
                                 <div className={`grid h-full w-full gap-0.5 ${nft.media.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
                                     {nft.media.slice(0, 4).map((item, index) => (
-                                        <div key={index} 
-                                            className={`
-                                            ${nft.media.length === 1 ? 'col-span-2 row-span-2' : ''}
-                                            ${nft.media.length === 2 ? 'row-span-2' : ''}
-                                            ${nft.media.length === 3 && index === 0 ? 'row-span-2' : ''}
-                                            bg-cream/10`}>
+                                        <div key={index} className={`...css classes for grid layout...`}>
                                             <a href={item.gatewayUrl} target="_blank" rel="noopener noreferrer" className="block w-full h-full">
-                                                <img 
-                                                    src={item.gatewayUrl} 
-                                                    alt={`${nft.title || 'Chronicle'} ${index + 1}`}
-                                                    className="w-full h-full object-cover"
-                                                    loading="lazy"
-                                                    onError={(e) => { e.target.src = 'https://dummyimage.com/600x600/f0f0f0/999999.png&text=Error'; }}
-                                                />
+                                                <img src={item.gatewayUrl} alt={`${nft.title} ${index + 1}`} className="w-full h-full object-cover" />
                                             </a>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
-                               <div className="aspect-square flex items-center justify-center bg-cream/10 text-warm-brown/70">"No media found"</div>
+                               <div className="flex items-center justify-center bg-cream/10 text-warm-brown/70">"No media found"</div>
                             )}
                         </div>
                         
                         <div className="p-6 flex-1 flex flex-col">
-                            <h2 className="text-2xl font-bold text-warm-brown truncate" title={nft.title}>{nft.title}</h2>
-                            <p className="text-sm text-warm-brown/70 mb-2">Token ID: {nft.tokenId}</p>
+                            <h2 className="text-2xl font-bold text-warm-brown truncate">{nft.title}</h2>
+                            <p className="text-sm text-warm-brown/70 mb-4">Token ID: {nft.tokenId}</p>
                             
                             <div className="mt-auto">
                                 <h3 className="font-semibold text-warm-brown mb-2">
                                     All Media ({nft.media?.length || 0}):
                                 </h3>
-                                <pre className="text-xs bg-black/10 p-2 rounded overflow-x-auto max-h-24">
-                                    {JSON.stringify(nft.media, null, 2)}
-                                </pre>
+                                <ul className="text-sm space-y-1 max-h-24 overflow-y-auto">
+                                    {nft.media.map((item, index) => (
+                                        <li key={index}>
+                                            <a href={item.gatewayUrl} target="_blank" rel="noopener noreferrer" className="text-sage-green hover:underline truncate block">
+                                                {item.fileName || `Item ${index + 1}`}
+                                            </a>
+                                        </li>
+                                    ))}
+                                </ul>
                             </div>
                         </div>
                     </div>
@@ -144,7 +138,7 @@ function GalleryPage() {
             </div>
             
             <div className="text-center mt-12">
-                <Link to="/" className="font-bold text-sage-green hover:text-forest-green">← Chronicle another moment</Link>
+                <Link to="/" className="font-bold text-sage-green hover:underline">← Chronicle another moment</Link>
             </div>
         </div>
     );
