@@ -8,8 +8,12 @@ const ALCHEMY_URL = `https://polygon-mainnet.g.alchemy.com/nft/v3/${ALCHEMY_API_
 
 const formatIpfsUrl = (url) => {
     if (!url || typeof url !== 'string') return '';
-    if (url.startsWith('ipfs://')) return `https://gateway.pinata.cloud/ipfs/${url.substring(7)}`;
-    if (url.startsWith('https://')) return url.replace('ipfs.io', 'gateway.pinata.cloud');
+    if (url.startsWith('ipfs://')) {
+        return `https://gateway.pinata.cloud/ipfs/${url.substring(7)}`;
+    }
+    if (url.startsWith('https://')) {
+        return url.replace('ipfs.io', 'gateway.pinata.cloud');
+    }
     return '';
 };
 
@@ -19,27 +23,31 @@ const fetchAndProcessNfts = async (account) => {
     let hasMore = true;
     while (hasMore) {
         let fetchUrl = `${ALCHEMY_URL}?owner=${account}&contractAddresses[]=${IWT_CONTRACT_ADDRESS}&withMetadata=true`;
-        if (pageKey) fetchUrl += `&pageKey=${pageKey}`;
+        if (pageKey) {
+            fetchUrl += `&pageKey=${pageKey}`;
+        }
         const response = await fetch(fetchUrl);
-        if (!response.ok) throw new Error(`Could not fetch NFT data from Alchemy`);
+        if (!response.ok) {
+            throw new Error(`Could not fetch NFT data from Alchemy`);
+        }
         const data = await response.json();
         if (data.ownedNfts) {
             allNfts.push(...data.ownedNfts);
         }
         pageKey = data.pageKey;
-        if (!pageKey) hasMore = false;
+        if (!pageKey) {
+            hasMore = false;
+        }
     }
     
     const nftPromises = allNfts.map(async (nft) => {
         const metadataUrl = formatIpfsUrl(nft.tokenUri);
         if (!metadataUrl) {
-            console.warn(`Token ${nft.tokenId} is missing a tokenUri.`);
             return null;
         }
         try {
             const metadataResponse = await fetch(metadataUrl);
             if (!metadataResponse.ok) {
-                console.warn(`Failed to fetch metadata for Token ${nft.tokenId} at ${metadataUrl}`);
                 return { tokenId: nft.tokenId, title: `Chronicle ${nft.tokenId}`, description: "Metadata is pending or failed to load.", media: [] };
             }
             const metadata = await metadataResponse.json();
@@ -61,7 +69,6 @@ const fetchAndProcessNfts = async (account) => {
                 media: mediaItems.filter(item => item && item.gatewayUrl)
             };
         } catch (e) {
-            console.error(`Could not parse metadata for Token ${nft.tokenId}. URL: ${metadataUrl}`, e);
             return { tokenId: nft.tokenId, title: `Chronicle ${nft.tokenId}`, description: "The metadata for this item is invalid or corrupted.", media: [] };
         }
     });
@@ -84,19 +91,12 @@ function GalleryPage() {
             setError('');
             try {
                 const processedNfts = await fetchAndProcessNfts(account);
-                
-                // --- THIS IS THE FINAL FIX ---
-                // We defensively treat `processedNfts` as an empty array `[]` if it is ever `undefined` or `null`.
-                // This prevents the `.filter()` method from ever crashing the page.
                 const validNfts = (processedNfts || []).filter(Boolean).sort((a, b) => b.tokenId - a.tokenId);
-                // --- END OF FINAL FIX ---
-                
                 setNfts(validNfts);
                 if (validNfts.length === 0 && !isLoading) {
-                    setError("You don't own any Chronicles yet, or they are still processing. Please check back soon.");
+                    setError("You don't own any Chronicles yet.");
                 }
             } catch (err) {
-                console.error("A critical error occurred in runFetch:", err);
                 setError(`A critical error occurred: ${err.message}`);
             } finally {
                 setIsLoading(false);
@@ -172,7 +172,7 @@ function GalleryPage() {
                         
                         <div className="p-6 flex-1 flex flex-col">
                             <h2 className="text-2xl font-bold text-warm-brown truncate" title={nft.title}>{nft.title}</h2>
-                            <p className="text-sm text-warm-brown/70 mb-4" title={nft.description}>{nft.description || "No description."}</p>
+                            <p className="text-sm text-warm-brown/70 mb-4">{nft.description || "No description."}</p>
                             <p className="text-sm text-warm-brown/70 mb-4">Token ID: {nft.tokenId}</p>
                             
                             {nft.media && nft.media.length > 0 && (
