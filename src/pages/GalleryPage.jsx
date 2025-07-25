@@ -2,8 +2,6 @@ import React, { useState, useEffect, useContext } from 'react';
 import { WalletContext } from '../contexts/WalletContext';
 import { Link } from 'react-router-dom';
 
-// All the helper and fetch functions at the top of the file remain the same
-// You can copy them from our previous conversation, including the paginated fetch.
 const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY;
 const IWT_CONTRACT_ADDRESS = import.meta.env.VITE_IWAS_THERE_NFT_ADDRESS;
 const ALCHEMY_URL = `https://polygon-mainnet.g.alchemy.com/nft/v3/${ALCHEMY_API_KEY}/getNFTsForOwner`;
@@ -29,7 +27,6 @@ const fetchAndProcessNfts = async (account) => {
         pageKey = data.pageKey;
         if (!pageKey) hasMore = false;
     }
-    console.log(`Fetched ${allNfts.length} total NFTs. Processing...`);
     
     const nftPromises = allNfts.map(async (nft) => {
         const metadataUrl = formatIpfsUrl(nft.tokenUri);
@@ -39,17 +36,13 @@ const fetchAndProcessNfts = async (account) => {
             if (!metadataResponse.ok) return { tokenId: nft.tokenId, title: "Metadata Fetch Failed", media: [] };
             const metadata = await metadataResponse.json();
             
-            // Defensive coding: ensure properties.media is a clean array
             let mediaItems = [];
             if (metadata.properties && Array.isArray(metadata.properties.media)) {
                 mediaItems = metadata.properties.media.map(item => ({
                     ...item,
                     gatewayUrl: formatIpfsUrl(item.gatewayUrl || (item.cid ? `ipfs://${item.cid}` : ''))
                 }));
-            }
-
-            // Backward-compatibility check
-            if (mediaItems.length === 0 && metadata.image) {
+            } else if (metadata.image) {
                 mediaItems.push({ gatewayUrl: formatIpfsUrl(metadata.image), fileName: 'Primary Image' });
             }
             
@@ -57,7 +50,6 @@ const fetchAndProcessNfts = async (account) => {
                 tokenId: nft.tokenId,
                 title: metadata.name || 'Untitled',
                 description: metadata.description || '',
-                // Final check to ensure we only return valid items
                 media: mediaItems.filter(item => item && item.gatewayUrl)
             };
         } catch (e) {
@@ -66,7 +58,6 @@ const fetchAndProcessNfts = async (account) => {
     });
     return Promise.all(nftPromises);
 };
-
 
 function GalleryPage() {
     const { account, connectWallet } = useContext(WalletContext);
@@ -78,7 +69,6 @@ function GalleryPage() {
         const runFetch = async () => {
             if (!account) { setNfts([]); return; }
             setIsLoading(true);
-            setError('');
             try {
                 const processedNfts = await fetchAndProcessNfts(account);
                 const validNfts = processedNfts.filter(Boolean);
@@ -95,7 +85,7 @@ function GalleryPage() {
     }, [account]);
 
     if (!account) {
-        // ... (return connect wallet button)
+        return <div className="text-center"><button onClick={connectWallet}>Connect Wallet</button></div>;
     }
 
     return (
@@ -109,13 +99,25 @@ function GalleryPage() {
                 {nfts.map(nft => (
                     <div key={nft.tokenId} className="bg-cream/20 backdrop-blur-md rounded-xl shadow-lg border border-warm-brown/20 flex flex-col overflow-hidden">
                         
-                        {/* Image Grid */}
                         <div className="aspect-square w-full">
                             {nft.media && nft.media.length > 0 ? (
-                                <div className={`grid h-full w-full gap-1 ${nft.media.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                <div className={`grid h-full w-full gap-0.5 ${nft.media.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
                                     {nft.media.slice(0, 4).map((item, index) => (
-                                        <div key={index} className={`...`}>
-                                            {/* Your img tag here */}
+                                        <div key={index} 
+                                            className={`
+                                            ${nft.media.length === 1 ? 'col-span-2 row-span-2' : ''}
+                                            ${nft.media.length === 2 ? 'row-span-2' : ''}
+                                            ${nft.media.length === 3 && index === 0 ? 'row-span-2' : ''}
+                                            bg-cream/10`}>
+                                            <a href={item.gatewayUrl} target="_blank" rel="noopener noreferrer" className="block w-full h-full">
+                                                <img 
+                                                    src={item.gatewayUrl} 
+                                                    alt={`${nft.title || 'Chronicle'} ${index + 1}`}
+                                                    className="w-full h-full object-cover"
+                                                    loading="lazy"
+                                                    onError={(e) => { e.target.src = 'https://dummyimage.com/600x600/f0f0f0/999999.png&text=Error'; }}
+                                                />
+                                            </a>
                                         </div>
                                     ))}
                                 </div>
@@ -124,22 +126,18 @@ function GalleryPage() {
                             )}
                         </div>
                         
-                        {/* Text Content */}
                         <div className="p-6 flex-1 flex flex-col">
-                            <h2 className="text-2xl font-bold text-warm-brown truncate">{nft.title}</h2>
+                            <h2 className="text-2xl font-bold text-warm-brown truncate" title={nft.title}>{nft.title}</h2>
                             <p className="text-sm text-warm-brown/70 mb-2">Token ID: {nft.tokenId}</p>
                             
-                            {/* --- DIAGNOSTIC AND FIX --- */}
                             <div className="mt-auto">
                                 <h3 className="font-semibold text-warm-brown mb-2">
                                     All Media ({nft.media?.length || 0}):
                                 </h3>
-                                {/* Raw Data Viewer */}
-                                <pre className="text-xs bg-black/10 p-2 rounded overflow-x-auto">
+                                <pre className="text-xs bg-black/10 p-2 rounded overflow-x-auto max-h-24">
                                     {JSON.stringify(nft.media, null, 2)}
                                 </pre>
                             </div>
-                            {/* --- END OF DIAGNOSTIC --- */}
                         </div>
                     </div>
                 ))}

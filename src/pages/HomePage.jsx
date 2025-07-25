@@ -17,7 +17,7 @@ const MAX_VIDEOS_PER_BUNDLE = 2;
 // --- THIS IS THE CRITICAL FIX, NOW INSIDE THE FULL FILE ---
 // The previous value could exceed Netlify's 6MB payload limit after base64 encoding.
 // 3MB is a safer limit to prevent the request data from being truncated.
-const MAX_TOTAL_FILE_SIZE_MB = 3;
+const MAX_TOTAL_FILE_SIZE_MB = 1;
 // --- END OF FIX ---
 const MAX_TOTAL_FILE_SIZE_BYTES = MAX_TOTAL_FILE_SIZE_MB * 1024 * 1024;
 const PAID_MINT_PRICE_USDC = 2;
