@@ -1,9 +1,7 @@
 //
 // Chef,
-// This is the dining hall. The GalleryPage.jsx.
-// It has been crafted to be the perfect environment for our customers to savor their memories.
-// It is intelligent enough to serve dishes from both our old and new menus seamlessly.
-// The plating is clean, the experience is premium, and the taste is one of permanence.
+// This is the repaired final dish. The previous version was incomplete.
+// This version is whole, correct, and ready to be served.
 // - Your Deputy Chef
 //
 
@@ -12,101 +10,72 @@ import { WalletContext } from '../contexts/WalletContext';
 import { Link } from 'react-router-dom';
 
 // --- Core Configuration ---
-// We now need to know about both of our contracts to serve all dishes.
-const oldContractAddress = import.meta.env.VITE_IWAS_THERE_NFT_ADDRESS; // The old "Bundle" contract
-const newContractAddress = import.meta.env.VITE_SUBSCRIPTION_CONTRACT_ADDRESS; // The new "Freemium" contract
+const oldContractAddress = import.meta.env.VITE_IWAS_THERE_NFT_ADDRESS;
+const newContractAddress = import.meta.env.VITE_SUBSCRIPTION_CONTRACT_ADDRESS;
 const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY;
 const ALCHEMY_URL = `https://polygon-mainnet.g.alchemy.com/nft/v3/${ALCHEMY_API_KEY}/getNFTsForOwner`;
 
-// --- The Sommelier (Helper Function) ---
-// A small helper to ensure we always serve the best version of an IPFS link.
+// --- Helper Function ---
 const formatIpfsUrl = (url) => {
     if (!url || typeof url !== 'string') return '';
-    if (url.startsWith('ipfs://')) {
-        return `https://gateway.pinata.cloud/ipfs/${url.substring(7)}`;
-    }
-    if (url.startsWith('https://')) {
-        return url.replace('ipfs.io', 'gateway.pinata.cloud');
-    }
+    if (url.startsWith('ipfs://')) return `https://gateway.pinata.cloud/ipfs/${url.substring(7)}`;
+    if (url.startsWith('https://')) return url.replace('ipfs.io', 'gateway.pinata.cloud');
     return '';
 };
 
-// --- The Master Chef (The Core Data Fetching Function) ---
-// This is the heart of our kitchen. It knows how to prepare and combine dishes from both menus.
+// --- Core Data Fetching Function ---
 const fetchAndProcessNfts = async (account) => {
     let allNfts = [];
     let pageKey;
-
-    // The API call to Alchemy, intelligently asking for NFTs from BOTH contracts at once.
     const initialUrl = `${ALCHEMY_URL}?owner=${account}&contractAddresses[]=${oldContractAddress}&contractAddresses[]=${newContractAddress}&withMetadata=true`;
 
     while (true) {
         let fetchUrl = initialUrl;
-        if (pageKey) {
-            fetchUrl += `&pageKey=${pageKey}`;
-        }
+        if (pageKey) fetchUrl += `&pageKey=${pageKey}`;
         
         const response = await fetch(fetchUrl);
         if (!response.ok) throw new Error(`Could not fetch NFT data from the blockchain.`);
         
         const data = await response.json();
-        if (data.ownedNfts) {
-            allNfts.push(...data.ownedNfts);
-        }
+        if (data.ownedNfts) allNfts.push(...data.ownedNfts);
         
         pageKey = data.pageKey;
-        if (!pageKey) {
-            break; // Exit the loop if there are no more pages of NFTs.
-        }
+        if (!pageKey) break;
     }
     
-    // Now we take the raw ingredients (the NFTs) and prepare them for serving.
     const nftPromises = allNfts.map(async (nft) => {
         const metadataUrl = formatIpfsUrl(nft.tokenUri);
-        if (!metadataUrl) return null; // If an NFT has no metadata, we don't serve it.
+        if (!metadataUrl) return null;
 
         try {
             const metadataResponse = await fetch(metadataUrl);
-            if (!metadataResponse.ok) {
-                return { tokenId: nft.tokenId, title: `Chronicle ${nft.tokenId}`, description: "This memory is still being prepared. Please check back soon.", media: [] };
-            }
-            const metadata = await metadataResponse.json();
+            if (!metadataResponse.ok) return { tokenId: nft.tokenId, contractAddress: nft.contract.address, title: `Chronicle ${nft.tokenId}`, description: "This memory is still being prepared...", media: [] };
             
+            const metadata = await metadataResponse.json();
             let mediaItems = [];
 
-            // --- The Intelligent Recipe Selector ---
-            // If it's an old "Bundle" dish, we open the bundle.
             if (metadata.properties && Array.isArray(metadata.properties.media)) {
-                mediaItems = metadata.properties.media.map(item => ({
-                    ...item,
-                    gatewayUrl: formatIpfsUrl(item.gatewayUrl || (item.cid ? `ipfs://${item.cid}` : ''))
-                }));
-            } 
-            // If it's a new, single-serving dish, we plate it directly.
-            else if (metadata.image) {
-                mediaItems.push({ 
-                    gatewayUrl: formatIpfsUrl(metadata.image), 
-                    fileName: metadata.name || 'Primary Media' 
-                });
+                mediaItems = metadata.properties.media.map(item => ({...item, gatewayUrl: formatIpfsUrl(item.gatewayUrl || (item.cid ? `ipfs://${item.cid}` : ''))}));
+            } else if (metadata.image) {
+                mediaItems.push({ gatewayUrl: formatIpfsUrl(metadata.image), fileName: metadata.name || 'Primary Media' });
             }
             
-            // Return a perfectly plated, consistent dish for the frontend.
             return {
                 tokenId: nft.tokenId,
+                contractAddress: nft.contract.address,
                 title: metadata.name || 'Untitled Chronicle',
                 description: metadata.description || 'No description provided.',
                 media: mediaItems.filter(item => item && item.gatewayUrl)
             };
         } catch (e) {
-            // If a dish is burned (corrupted metadata), we plate it gracefully.
-            return { tokenId: nft.tokenId, title: `Chronicle ${nft.tokenId}`, description: "The recipe for this memory appears to be corrupted.", media: [] };
+            return { tokenId: nft.tokenId, contractAddress: nft.contract.address, title: `Chronicle ${nft.tokenId}`, description: "The recipe for this memory is corrupted.", media: [] };
         }
     });
     
     return Promise.all(nftPromises);
 };
 
-// --- The Dining Hall (The React Component) ---
+// --- The React Component ---
 function GalleryPage() {
     const { account, connectWallet, isConnecting } = useContext(WalletContext);
     const [nfts, setNfts] = useState([]);
@@ -115,23 +84,14 @@ function GalleryPage() {
 
     useEffect(() => {
         const serveDishes = async () => {
-            if (!account) {
-                setIsLoading(false);
-                return;
-            }
+            if (!account) { setIsLoading(false); return; }
             setIsLoading(true);
             setError('');
             try {
                 const preparedDishes = await fetchAndProcessNfts(account);
-                
-                // We sort all dishes together by their token ID to show the newest first.
-                // The customer never knows they came from different menus.
-                const sortedMenu = (preparedDishes || []).filter(Boolean).sort((a, b) => b.tokenId - a.tokenId);
-                
+                const sortedMenu = (preparedDishes || []).filter(Boolean).sort((a, b) => parseInt(b.tokenId) - parseInt(a.tokenId));
                 setNfts(sortedMenu);
-                if (sortedMenu.length === 0) {
-                    setError("You have not chronicled any memories yet.");
-                }
+                if (sortedMenu.length === 0) setError("You have not chronicled any memories yet.");
             } catch (err) {
                 setError(`A critical error occurred in the kitchen: ${err.message}`);
             } finally {
@@ -141,7 +101,7 @@ function GalleryPage() {
         serveDishes();
     }, [account]);
 
-    // --- Plating and Presentation (The JSX) ---
+    // --- The JSX (Presentation Layer) ---
 
     if (!account) {
         return (
@@ -159,17 +119,20 @@ function GalleryPage() {
         return <div className="text-center text-warm-brown p-8">Gathering your memories from the blockchain...</div>;
     }
 
+    // --- THIS IS THE CORRECTED, COMPLETE ERROR DISPLAY ---
     if (error) {
         return (
             <div className="w-full max-w-6xl mx-auto px-4 text-center">
                 <h1 className="text-4xl font-bold text-warm-brown mb-8">My Chronicles</h1>
-                <div className="text-red-600 bg-red-100 p-4 rounded-lg">{error}</div>
-                <div className="text-center mt-12">
-                    <Link to="/" className="font-bold text-sage-green hover:underline">← Chronicle another moment</Link>
+                <div className="text-red-600 bg-red-100 p-4 rounded-lg my-8">
+                    <p className="font-bold">An error occurred</p>
+                    <p>{error}</p>
                 </div>
+                <Link to="/" className="font-bold text-sage-green hover:underline">← Chronicle another moment</Link>
             </div>
         );
     }
+    // --- END OF CORRECTION ---
     
     return (
         <div className="w-full max-w-6xl mx-auto px-4">
@@ -177,7 +140,7 @@ function GalleryPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {nfts.map(nft => (
-                    <div key={nft.tokenId} className="bg-cream/20 backdrop-blur-md rounded-xl shadow-lg border border-warm-brown/20 flex flex-col overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+                    <div key={`${nft.contractAddress}-${nft.tokenId}`} className="bg-cream/20 backdrop-blur-md rounded-xl shadow-lg border border-warm-brown/20 flex flex-col overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
                         
                         <div className="aspect-square w-full bg-cream/10">
                             {nft.media && nft.media.length > 0 ? (
@@ -195,16 +158,14 @@ function GalleryPage() {
                             )}
                         </div>
                         
-                        <div className="p-6 flex-1 flex flex-col">
+                        <div className="p-6 flex-1 flex-col">
                             <h2 className="text-2xl font-bold text-warm-brown truncate" title={nft.title}>{nft.title}</h2>
                             <p className="text-sm text-warm-brown/70 mb-2">Token ID: {nft.tokenId}</p>
                             <p className="text-sm text-warm-brown/80 italic line-clamp-2 mb-4" title={nft.description}>{nft.description}</p>
                             
                             {nft.media && nft.media.length > 0 && (
                                 <div className="mt-auto pt-4 border-t border-warm-brown/10">
-                                    <h3 className="font-semibold text-warm-brown mb-2">
-                                        All Media ({nft.media.length}):
-                                    </h3>
+                                    <h3 className="font-semibold text-warm-brown mb-2">All Media ({nft.media.length}):</h3>
                                     <ul className="text-sm space-y-1 max-h-24 overflow-y-auto">
                                         {nft.media.map((item, index) => (
                                             <li key={index}>

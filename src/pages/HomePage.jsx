@@ -1,8 +1,6 @@
 //
-// Chef,
-// This is the complete and final main course, re-prepared as you ordered.
-// Every ingredient is present. No shortcuts. No missing pieces.
-// This dish is ready to be served to our customers.
+// Chef, this is the main course. The HomePage.jsx.
+// It is our restaurant's first impression. It must be perfect.
 // - Your Deputy Chef
 //
 
@@ -11,6 +9,8 @@ window.Buffer = Buffer;
 import React, { useState, useEffect, useContext, useRef, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { WalletContext } from '../contexts/WalletContext.jsx';
+
+// This ABI must be located at `frontend/src/abis/SubscriptionContract.json`
 import SubscriptionContractABI from '../abis/SubscriptionContract.json'; 
 import ERC20ABI_file from '../abis/ERC20.json';
 const ERC20ABI = ERC20ABI_file.abi;
@@ -25,7 +25,7 @@ const publicRpcUrl = import.meta.env.VITE_PUBLIC_POLYGON_RPC_URL;
 const SUBSCRIPTION_PRICE_USDC = 2;
 const PHOTOS_PER_PACKAGE = 30;
 const VIDEOS_PER_PACKAGE = 3;
-const MAX_FILE_SIZE_MB = 50; // The new, generous single-file limit
+const MAX_FILE_SIZE_MB = 50;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 function HomePage() {
@@ -42,7 +42,8 @@ function HomePage() {
     const checkSubscription = useCallback(async () => {
         if (!account) return;
         const readOnlyProvider = new ethers.providers.JsonRpcProvider(publicRpcUrl);
-        const contract = new ethers.Contract(subscriptionContractAddress, SubscriptionContractABI, readOnlyProvider);
+        // The ABI for our new contract
+        const contract = new ethers.Contract(subscriptionContractAddress, SubscriptionContractABI.abi, readOnlyProvider); 
         try {
             const [subExpiry, photosLeft, videosLeft, hasClaimed] = await Promise.all([
                 contract.subscriptionValidUntil(account),
@@ -81,18 +82,15 @@ function HomePage() {
             if (fileInputRef.current) fileInputRef.current.value = "";
             setSelectedFile(null);
         };
-
         if (!file) {
             resetInput();
             return;
         }
-
         if (file.size > MAX_FILE_SIZE_BYTES) {
             setFeedback(`Error: File is too large. The maximum size is ${MAX_FILE_SIZE_MB}MB.`);
             resetInput();
             return;
         }
-        
         setSelectedFile(file);
         setFeedback("A new memory is ready. Add a title and description.");
     };
@@ -104,7 +102,7 @@ function HomePage() {
         setIsLoading(true);
         setFeedback("Claiming your free mints on the blockchain...");
         try {
-            const contract = new ethers.Contract(subscriptionContractAddress, SubscriptionContractABI, signer);
+            const contract = new ethers.Contract(subscriptionContractAddress, SubscriptionContractABI.abi, signer);
             const claimTx = await contract.claimFreePackage();
             await claimTx.wait(1);
             setLatestTxHash(claimTx.hash);
@@ -123,13 +121,11 @@ function HomePage() {
         setFeedback("Preparing your new package...");
         try {
             const usdc = new ethers.Contract(usdcAddress, ERC20ABI, signer);
-            const contract = new ethers.Contract(subscriptionContractAddress, SubscriptionContractABI, signer);
+            const contract = new ethers.Contract(subscriptionContractAddress, SubscriptionContractABI.abi, signer);
             const priceWei = ethers.utils.parseUnits(SUBSCRIPTION_PRICE_USDC.toString(), 6);
-
             setFeedback("Please approve the USDC payment in your wallet...");
             const approveTx = await usdc.approve(contract.address, priceWei);
             await approveTx.wait(1);
-
             setFeedback("Finalizing your purchase on the blockchain...");
             const purchaseTx = await contract.purchaseCreditPackage();
             await purchaseTx.wait(1);
@@ -154,10 +150,8 @@ function HomePage() {
                 fileContentBase64: Buffer.from(await selectedFile.arrayBuffer()).toString('base64'),
                 fileType: selectedFile.type,
             };
-
             setFeedback("Please sign the message to verify ownership...");
             const signature = await signer.signMessage(`ChronicleMe: Verifying access for ${account} to upload media and request mint.`);
-            
             setFeedback("Uploading your memory to the permanent web...");
             const body = { file: fileData, walletAddress: account, signature, title, description };
             const response = await fetch('/.netlify/functions/processMint', {
@@ -167,10 +161,8 @@ function HomePage() {
             });
             const result = await response.json();
             if (!response.ok) throw new Error(result.error);
-
             const ipfsMetadataCid = `ipfs://${result.metadataCID}`;
-            const contract = new ethers.Contract(subscriptionContractAddress, SubscriptionContractABI, signer);
-            
+            const contract = new ethers.Contract(subscriptionContractAddress, SubscriptionContractABI.abi, signer);
             const isVideo = selectedFile.type.startsWith('video/');
             let mintTx;
             setFeedback("Minting your Chronicle on the blockchain...");
@@ -180,7 +172,6 @@ function HomePage() {
                 mintTx = await contract.mintPhoto(ipfsMetadataCid);
             }
             await mintTx.wait(1);
-
             setFeedback("🎉 Your memory is now immortal! It is forever yours.");
             setLatestTxHash(mintTx.hash);
             setSelectedFile(null);
@@ -188,7 +179,6 @@ function HomePage() {
             setDescription('');
             if (fileInputRef.current) fileInputRef.current.value = "";
             await checkSubscription();
-
         } catch (error) {
             setFeedback(`Minting failed: ${error.reason || error.message}`);
         } finally {
@@ -221,8 +211,8 @@ function HomePage() {
                 </div>
             );
         }
-        if (subscription.photos === 0 && subscription.videos === 0) {
-            return (
+        if (subscription.photos === 0 && subscription.videos === 0 && subscription.isActive === false) {
+             return (
                 <div className="text-center space-y-4">
                      <CreditsDisplay />
                     <p className="text-warm-brown/90">You have used all your credits. Purchase another package to continue.</p>
