@@ -1,27 +1,16 @@
-//
-// Chef, this is the main course. The HomePage.jsx.
-// It is our restaurant's first impression. It must be perfect.
-// - Your Deputy Chef
-//
-
 import { Buffer } from 'buffer';
 window.Buffer = Buffer;
 import React, { useState, useEffect, useContext, useRef, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { WalletContext } from '../contexts/WalletContext.jsx';
-
-// This ABI must be located at `frontend/src/abis/SubscriptionContract.json`
 import SubscriptionContractABI from '../abis/SubscriptionContract.json'; 
 import ERC20ABI_file from '../abis/ERC20.json';
 const ERC20ABI = ERC20ABI_file.abi;
 
-
-// --- Core Configuration ---
 const subscriptionContractAddress = import.meta.env.VITE_SUBSCRIPTION_CONTRACT_ADDRESS;
 const usdcAddress = import.meta.env.VITE_USDC_ADDRESS;
 const publicRpcUrl = import.meta.env.VITE_PUBLIC_POLYGON_RPC_URL;
 
-// --- The Menu (Business Logic) ---
 const SUBSCRIPTION_PRICE_USDC = 2;
 const PHOTOS_PER_PACKAGE = 30;
 const VIDEOS_PER_PACKAGE = 3;
@@ -32,7 +21,7 @@ function HomePage() {
     const { signer, account, connectWallet, isConnecting } = useContext(WalletContext);
     const [isLoading, setIsLoading] = useState(false);
     const [feedback, setFeedback] = useState("Connecting to the blockchain...");
-    const [subscription, setSubscription] = useState({ isActive: false, hasClaimed: false, photos: 0, videos: 0 });
+    const [subscription, setSubscription] = useState({ hasClaimed: false, photos: 0, videos: 0 });
     const [selectedFile, setSelectedFile] = useState(null);
     const [latestTxHash, setLatestTxHash] = useState('');
     const [description, setDescription] = useState('');
@@ -42,25 +31,26 @@ function HomePage() {
     const checkSubscription = useCallback(async () => {
         if (!account) return;
         const readOnlyProvider = new ethers.providers.JsonRpcProvider(publicRpcUrl);
-        // The ABI for our new contract
-        const contract = new ethers.Contract(subscriptionContractAddress, SubscriptionContractABI.abi, readOnlyProvider); 
+        const contract = new ethers.Contract(subscriptionContractAddress, SubscriptionContractABI.abi, readOnlyProvider);
         try {
-            const [subExpiry, photosLeft, videosLeft, hasClaimed] = await Promise.all([
-                contract.subscriptionValidUntil(account),
+            // --- THIS IS THE CRITICAL FIX ---
+            // The recipe now calls the correct function names from our repaired machine.
+            const [photosLeft, videosLeft, hasClaimed] = await Promise.all([
                 contract.photoCredits(account),
                 contract.videoCredits(account),
                 contract.hasClaimedFreePackage(account)
             ]);
-            
-            const isActive = subExpiry.gt(Math.floor(Date.now() / 1000));
-            setSubscription({ isActive, hasClaimed, photos: Number(photosLeft), videos: Number(videosLeft) });
+            // We no longer need to check for a time-based subscription.
+            // --- END OF FIX ---
 
-            if (isActive) {
-                setFeedback("Welcome back! Select a file to immortalize.");
-            } else if (!hasClaimed) {
+            setSubscription({ hasClaimed, photos: Number(photosLeft), videos: Number(videosLeft) });
+
+            if (!hasClaimed) {
                 setFeedback("Your journey begins. Claim your free package to start.");
+            } else if (Number(photosLeft) > 0 || Number(videosLeft) > 0) {
+                setFeedback("Welcome back! Select a file to immortalize.");
             } else {
-                setFeedback("Your subscription has expired or you have used your free credits. Purchase a new package to continue.");
+                setFeedback("You have used all your credits. Purchase a new package to continue.");
             }
         } catch (error) {
             console.error("Could not check subscription:", error);
