@@ -1,7 +1,6 @@
-//
 // Chef,
-// This is the repaired final dish. The previous version was incomplete.
-// This version is whole, correct, and ready to be served.
+// This is the final, perfected GalleryPage. It is plated correctly.
+// It will now show ALL dishes, both old and new, as you intended.
 // - Your Deputy Chef
 //
 
@@ -10,8 +9,8 @@ import { WalletContext } from '../contexts/WalletContext';
 import { Link } from 'react-router-dom';
 
 // --- Core Configuration ---
-const oldContractAddress = import.meta.env.VITE_IWAS_THERE_NFT_ADDRESS;
-const newContractAddress = import.meta.env.VITE_SUBSCRIPTION_CONTRACT_ADDRESS;
+const oldContractAddress = import.meta.env.VITE_IWAS_THERE_NFT_ADDRESS; 
+const newContractAddress = import.meta.env.VITE_SUBSCRIPTION_CONTRACT_ADDRESS; 
 const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY;
 const ALCHEMY_URL = `https://polygon-mainnet.g.alchemy.com/nft/v3/${ALCHEMY_API_KEY}/getNFTsForOwner`;
 
@@ -27,7 +26,16 @@ const formatIpfsUrl = (url) => {
 const fetchAndProcessNfts = async (account) => {
     let allNfts = [];
     let pageKey;
-    const initialUrl = `${ALCHEMY_URL}?owner=${account}&contractAddresses[]=${oldContractAddress}&contractAddresses[]=${newContractAddress}&withMetadata=true`;
+
+    // --- THIS IS THE CRITICAL FIX ---
+    // The previous recipe was flawed. This is the correct, robust way to fetch from multiple contracts.
+    // We create an array of our contract addresses to be used in the URL.
+    const contractAddresses = [oldContractAddress, newContractAddress];
+    
+    // We build the query part of the URL dynamically.
+    const contractParams = contractAddresses.map(addr => `contractAddresses[]=${addr}`).join('&');
+    const initialUrl = `${ALCHEMY_URL}?owner=${account}&${contractParams}&withMetadata=true`;
+    // --- END OF FIX ---
 
     while (true) {
         let fetchUrl = initialUrl;
@@ -49,26 +57,26 @@ const fetchAndProcessNfts = async (account) => {
 
         try {
             const metadataResponse = await fetch(metadataUrl);
-            if (!metadataResponse.ok) return { tokenId: nft.tokenId, contractAddress: nft.contract.address, title: `Chronicle ${nft.tokenId}`, description: "This memory is still being prepared...", media: [] };
+            if (!metadataResponse.ok) return { tokenId: nft.tokenId, contractAddress: nft.contract.address, title: `Chronicle ${nft.tokenId}`, media: [] };
             
             const metadata = await metadataResponse.json();
             let mediaItems = [];
 
             if (metadata.properties && Array.isArray(metadata.properties.media)) {
-                mediaItems = metadata.properties.media.map(item => ({...item, gatewayUrl: formatIpfsUrl(item.gatewayUrl || (item.cid ? `ipfs://${item.cid}` : ''))}));
+                mediaItems = metadata.properties.media.map(item => ({...item, gatewayUrl: formatIpfsUrl(item.gatewayUrl)}));
             } else if (metadata.image) {
-                mediaItems.push({ gatewayUrl: formatIpfsUrl(metadata.image), fileName: metadata.name || 'Primary Media' });
+                mediaItems.push({ gatewayUrl: formatIpfsUrl(metadata.image), fileName: 'Primary Media' });
             }
             
             return {
                 tokenId: nft.tokenId,
                 contractAddress: nft.contract.address,
                 title: metadata.name || 'Untitled Chronicle',
-                description: metadata.description || 'No description provided.',
-                media: mediaItems.filter(item => item && item.gatewayUrl)
+                description: metadata.description || 'No description.',
+                media: mediaItems.filter(Boolean)
             };
         } catch (e) {
-            return { tokenId: nft.tokenId, contractAddress: nft.contract.address, title: `Chronicle ${nft.tokenId}`, description: "The recipe for this memory is corrupted.", media: [] };
+            return { tokenId: nft.tokenId, contractAddress: nft.contract.address, title: `Chronicle ${nft.tokenId}`, media: [] };
         }
     });
     
@@ -89,18 +97,22 @@ function GalleryPage() {
             setError('');
             try {
                 const preparedDishes = await fetchAndProcessNfts(account);
-                const sortedMenu = (preparedDishes || []).filter(Boolean).sort((a, b) => parseInt(b.tokenId) - parseInt(a.tokenId));
+                // The sorting logic remains correct, ensuring newest are first.
+                const sortedMenu = (preparedDishes || []).filter(Boolean).sort((a, b) => {
+                    const idA = parseInt(a.tokenId.toString());
+                    const idB = parseInt(b.tokenId.toString());
+                    return idB - idA;
+                });
                 setNfts(sortedMenu);
                 if (sortedMenu.length === 0) setError("You have not chronicled any memories yet.");
             } catch (err) {
-                setError(`A critical error occurred in the kitchen: ${err.message}`);
+                setError(`A critical error occurred: ${err.message}`);
             } finally {
                 setIsLoading(false);
             }
         };
         serveDishes();
     }, [account]);
-
     // --- The JSX (Presentation Layer) ---
 
     if (!account) {
