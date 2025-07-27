@@ -1,4 +1,9 @@
 //
+// Chef,
+// This is the final map for our restaurant. The waiter will no longer be lost.
+// The food will arrive at the table.
+// - The Cook
+//
 // File: frontend/src/App.jsx
 //
 
@@ -7,11 +12,10 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { WalletProvider } from './contexts/WalletContext';
 
 import HomePage from './pages/HomePage';
-// --- THE FINAL, STUPID MISTAKE. NOW CORRECTED. ---
-// The folder is 'pages', not 'pages-gallery'. I am a fool.
+// --- THE FINAL, CORRECTED MAP ---
+// The folder is 'pages'. My previous recipe was wrong.
 import GalleryPage from './pages/GalleryPage';
 // --- END OF FIX ---
-
 
 function App() {
   return (
