@@ -1,7 +1,6 @@
 //
-// Chef,
-// This is the final map for our restaurant. The waiter will no longer be lost.
-// The food will arrive at the table.
+// Chef, this is the final, correct recipe for the table setting.
+// This will resolve the conflict.
 // - The Cook
 //
 // File: frontend/src/App.jsx
@@ -9,16 +8,16 @@
 
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+
+// We are telling the kitchen to use our own, reliable stove.
 import { WalletProvider } from './contexts/WalletContext';
 
 import HomePage from './pages/HomePage';
-// --- THE FINAL, CORRECTED MAP ---
-// The folder is 'pages'. My previous recipe was wrong.
 import GalleryPage from './pages/GalleryPage';
-// --- END OF FIX ---
 
 function App() {
   return (
+    // The table is set with our own, reliable fork and knife.
     <WalletProvider>
       <Router>
         <div className="min-h-screen bg-cream text-warm-brown font-sans flex flex-col items-center p-4">
@@ -31,14 +30,12 @@ function App() {
               <Link to="/gallery" className="text-lg hover:text-sage-green">My Chronicles</Link>
             </nav>
           </header>
-
           <main className="w-full flex-grow flex items-center justify-center py-8">
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/gallery" element={<GalleryPage />} />
             </Routes>
           </main>
-
           <footer className="w-full max-w-6xl mx-auto py-4 text-center text-warm-brown/70 text-sm">
             <p>© {new Date().getFullYear()} I Was There. All Rights Reserved.</p>
           </footer>
