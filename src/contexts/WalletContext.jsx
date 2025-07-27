@@ -1,8 +1,8 @@
 //
 // Şef,
-// Bu, yeni yardımcınızın tarifidir. Mobil bağlantı sorununu
-// çözmek için fırının ayarları düzeltilmiştir.
-// - Robot
+// Bu, yeni yardımcınızın son ve kesin tarifidir. Donan garson sorununu
+// çözmek için tasarlanmıştır. Ben sadece onun talimatlarını uyguluyorum.
+// - Kalfa
 //
 // Dosya Konumu: frontend/src/contexts/WalletContext.jsx
 //
@@ -15,47 +15,82 @@ export const WalletContext = createContext();
 export const WalletProvider = ({ children }) => {
     const [account, setAccount] = useState(null);
     const [provider, setProvider] = useState(null);
+    const [signer, setSigner] = useState(null);
     const [isConnecting, setIsConnecting] = useState(false);
     const [error, setError] = useState('');
-    const [signer, setSigner] = useState(null); // Signer'ı da state'e ekliyoruz.
 
-    // --- YENİ YARDIMCININ connectWallet TARİFİ (DOKUNULMADI, ÇÜNKÜ DOĞRU) ---
+    // --- YENİ YARDIMCININ TALİMATI: Adım 1 - "Sessiz Bağlantı" Fonksiyonu ---
+    // Bu fonksiyon, kullanıcı etkileşimi olmadan, sayfa yüklendiğinde
+    // mevcut bir bağlantıyı sessizce kontrol etmek için kullanılacak.
+    const checkExistingConnection = useCallback(async () => {
+        if (typeof window.ethereum === 'undefined') return;
+
+        try {
+            // 'eth_accounts' metodu, kullanıcı onayı olmadan mevcut hesapları döndürür.
+            const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+
+            if (accounts && accounts.length > 0) {
+                console.log("Mevcut bağlantı bulundu:", accounts[0]);
+                const newAccount = accounts[0];
+                const newProvider = new ethers.providers.Web3Provider(window.ethereum);
+                const newSigner = newProvider.getSigner();
+                setAccount(newAccount);
+                setProvider(newProvider);
+                setSigner(newSigner);
+            }
+        } catch (err) {
+            console.error("Mevcut bağlantı kontrol edilirken hata:", err);
+        }
+    }, []);
+
+    // --- YENİ YARDIMCININ TALİMATI: Adım 3 - Güncellenmiş `connectWallet` Fonksiyonu ---
     const connectWallet = useCallback(async () => {
         setIsConnecting(true);
         setError('');
 
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         if (typeof window.ethereum === 'undefined') {
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
             if (isMobile) {
                 const deepLink = `https://metamask.app.link/dapp/${window.location.host}`;
                 window.location.href = deepLink;
                 return;
             } else {
-                setError("MetaMask eklentisi bulunamadı. Lütfen tarayıcınıza MetaMask'i yükleyin.");
+                setError("MetaMask eklentisi bulunamadı. Lütfen yükleyin.");
                 setIsConnecting(false);
                 return;
             }
         }
 
         try {
-            const newProvider = new ethers.providers.Web3Provider(window.ethereum, "any");
-            await newProvider.send("eth_requestAccounts", []);
+            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+
+            if (!accounts || accounts.length === 0) {
+                throw new Error("Cüzdan bağlantısı reddedildi.");
+            }
+            
+            const newAccount = accounts[0];
+            const newProvider = new ethers.providers.Web3Provider(window.ethereum);
             const newSigner = newProvider.getSigner();
-            const newAccount = await newSigner.getAddress();
             
             setAccount(newAccount);
             setProvider(newProvider);
-            setSigner(newSigner); // Signer'ı state'e kaydediyoruz.
+            setSigner(newSigner);
 
         } catch (err) {
             console.error("Bağlantı Hatası:", err);
             setError(err.message || "Cüzdan bağlanamadı.");
         } finally {
+            // Bu blok, try veya catch bittikten sonra HER ZAMAN çalışır.
             setIsConnecting(false);
         }
     }, []);
 
-    // --- YENİ YARDIMCININ useEffect TARİFİ (YENİ FIRIN AYARI) ---
+    // --- YENİ YARDIMCININ TALİMATI: Adım 2 - Sayfa Yüklendiğinde Kontrolü Çalıştır ---
+    useEffect(() => {
+        checkExistingConnection();
+    }, [checkExistingConnection]);
+
+    // Olay dinleyicileri için ikinci bir useEffect bloğu
     useEffect(() => {
         if (typeof window.ethereum === 'undefined') return;
 
@@ -66,14 +101,19 @@ export const WalletProvider = ({ children }) => {
                 setProvider(null);
                 setSigner(null);
                 setError("Cüzdan bağlantısı kesildi.");
-            } else if (accounts[0] !== account) {
-                connectWallet();
+            } else {
+                // Sadece state'i güncelle, yeniden bağlanma döngüsü yaratma
+                setAccount(accounts[0]);
+                const newProvider = new ethers.providers.Web3Provider(window.ethereum);
+                const newSigner = newProvider.getSigner();
+                setProvider(newProvider);
+                setSigner(newSigner);
             }
         };
 
         const handleChainChanged = (_chainId) => {
             console.log("Ağ değişti:", _chainId);
-            connectWallet();
+            window.location.reload(); // Ağ değiştiğinde yeniden yüklemek en güvenli yöntemdir.
         };
 
         window.ethereum.on('accountsChanged', handleAccountsChanged);
@@ -85,8 +125,7 @@ export const WalletProvider = ({ children }) => {
                 window.ethereum.removeListener('chainChanged', handleChainChanged);
             }
         };
-    }, [account, connectWallet]);
-    // --- YENİ YARDIMCININ TARİFİNİN SONU ---
+    }, []);
 
     return (
         <WalletContext.Provider value={{ account, provider, signer, connectWallet, isConnecting, error }}>
