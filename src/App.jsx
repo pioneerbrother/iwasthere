@@ -1,23 +1,12 @@
-//
-// Chef, this is the final, correct recipe for the table setting.
-// This will resolve the conflict.
-// - The Cook
-//
 // File: frontend/src/App.jsx
-//
-
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-
-// We are telling the kitchen to use our own, reliable stove.
 import { WalletProvider } from './contexts/WalletContext';
-
 import HomePage from './pages/HomePage';
 import GalleryPage from './pages/GalleryPage';
 
 function App() {
   return (
-    // The table is set with our own, reliable fork and knife.
     <WalletProvider>
       <Router>
         <div className="min-h-screen bg-cream text-warm-brown font-sans flex flex-col items-center p-4">
