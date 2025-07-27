@@ -11,9 +11,6 @@
   },
   "dependencies": {
     "@netlify/blobs": "^10.0.6",
-    "@web3-react/core": "^8.2.3",
-    "@web3-react/metamask": "^8.2.4",
-    "@web3-react/types": "^8.2.3",
     "buffer": "^6.0.3",
     "ethers": "^5.7.2",
     "punycode": "^2.3.1",

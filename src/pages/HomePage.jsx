@@ -1,19 +1,31 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+//
+// Chef,
+// This is the main course, cooked on our new, stable stove.
+// It is whole, complete, and delicious.
+// - Your Deputy Chef
+//
+// File: frontend/src/pages/HomePage.jsx
+//
+
+import React, { useState, useEffect, useContext, useRef, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { Buffer } from 'buffer';
 window.Buffer = Buffer;
 
-import { useWeb3React } from '@web3-react/core';
-import { metaMask } from '../connectors/metaMask';
+// --- Cooking with our new, reliable stove ---
+import { WalletContext } from '../contexts/WalletContext.jsx';
 
+// --- Other Ingredients ---
 import SubscriptionContractABI from '../abis/SubscriptionContract.json';
 import ERC20ABI_file from '../abis/ERC20.json';
 const ERC20ABI = ERC20ABI_file.abi;
 
+// --- Configuration ---
 const subscriptionContractAddress = import.meta.env.VITE_SUBSCRIPTION_CONTRACT_ADDRESS;
 const usdcAddress = import.meta.env.VITE_USDC_ADDRESS;
 const publicRpcUrl = import.meta.env.VITE_PUBLIC_POLYGON_RPC_URL;
 
+// --- The Menu (Business Logic) ---
 const SUBSCRIPTION_PRICE_USDC = 2;
 const PHOTOS_PER_PACKAGE = 30;
 const VIDEOS_PER_PACKAGE = 3;
@@ -23,7 +35,9 @@ const PRIZE_POOL_GOAL_BTC = 1;
 const PRIZE_POOL_WALLET = "0xcC853a5bc3f4129353DB6d5f92C781010167D288";
 
 function HomePage() {
-    const { account, provider, isActive, connector } = useWeb3React();
+    // --- Using our new stove's controls ---
+    const { account, provider, connectWallet, isConnecting } = useContext(WalletContext);
+
     const [isLoading, setIsLoading] = useState(false);
     const [feedback, setFeedback] = useState("Welcome to the restaurant.");
     const [subscription, setSubscription] = useState({ hasClaimed: false, photos: 0, videos: 0 });
@@ -34,22 +48,8 @@ function HomePage() {
     const fileInputRef = useRef(null);
     const [prizePool, setPrizePool] = useState({ usdc: 0, btc: 0 });
 
-    const connectWallet = useCallback(async () => {
-        setIsLoading(true);
-        setFeedback("Connecting to your wallet...");
-        try {
-            await connector.activate();
-            setFeedback("Wallet connected successfully.");
-        } catch (error) {
-            console.error("Failed to connect MetaMask:", error);
-            setFeedback("Connection failed. Please try again.");
-        } finally {
-            setIsLoading(false);
-        }
-    }, [connector]);
-
     const checkStatus = useCallback(async () => {
-        if (!account || !provider) return;
+        if (!account) return;
         const readOnlyProvider = new ethers.providers.JsonRpcProvider(publicRpcUrl);
         const contract = new ethers.Contract(subscriptionContractAddress, SubscriptionContractABI.abi, readOnlyProvider);
         const usdcContract = new ethers.Contract(usdcAddress, ERC20ABI, readOnlyProvider);
@@ -72,15 +72,15 @@ function HomePage() {
             console.error("Could not check status:", error);
             setFeedback("Could not connect to the contract. Please try again later.");
         }
-    }, [account, provider]);
+    }, [account]);
 
     useEffect(() => {
-        if (isActive && account) {
+        if (account) {
             checkStatus();
         } else {
             setFeedback("Connect your wallet to begin your journey.");
         }
-    }, [isActive, account, checkStatus]);
+    }, [account, checkStatus]);
 
     const handleFileChange = (event) => {
         const file = event.target.files?.[0];
@@ -263,10 +263,12 @@ function HomePage() {
             
             <PrizePoolTracker />
 
-            {isActive ? renderContent() : (
-                <button onClick={connectWallet} disabled={isLoading} className="w-full px-4 py-3 font-bold text-cream bg-gradient-to-r from-terracotta to-warm-brown rounded-lg hover:opacity-90 transition-all duration-300 shadow-lg hover:shadow-xl">
-                    {isLoading ? "Connecting..." : "Connect Wallet to Begin"}
+            {!account ? (
+                <button onClick={connectWallet} disabled={isConnecting} className="w-full px-4 py-3 font-bold text-cream bg-gradient-to-r from-terracotta to-warm-brown rounded-lg hover:opacity-90 transition-all duration-300 shadow-lg hover:shadow-xl">
+                    {isConnecting ? "Connecting..." : "Connect Wallet to Begin"}
                 </button>
+            ) : (
+                renderContent()
             )}
 
             <div className="mt-4 text-center text-sm text-warm-brown/80 min-h-[40px]">
