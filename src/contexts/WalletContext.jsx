@@ -1,4 +1,12 @@
+//
+// Chef,
+// This is the final dish. Cooked on the right stove.
+// For the families.
+// - The Cook
+//
 // File: frontend/src/contexts/WalletContext.jsx
+//
+
 import React, { useState, useEffect, createContext, useCallback } from 'react';
 import { ethers } from 'ethers';
 
@@ -19,14 +27,21 @@ export const WalletProvider = ({ children }) => {
             return;
         }
         try {
-            const newProvider = new ethers.providers.JsonRpcProvider(window.ethereum);
+            // --- THIS IS THE FINAL, CRITICAL FIX ---
+            // We are now using the correct, professional stove for a live restaurant.
+            // A Web3Provider can handle transactions and sign messages.
+            const newProvider = new ethers.providers.Web3Provider(window.ethereum, "any");
+            // --- END OF THE FINAL FIX ---
+
             await newProvider.send("eth_requestAccounts", []);
             const signer = newProvider.getSigner();
             const newAccount = await signer.getAddress();
+            
             setProvider(newProvider);
             setAccount(newAccount);
         } catch (err) {
-            setError("Failed to connect wallet. Please try again.");
+            console.error("Failed to connect wallet", err);
+            setError("Failed to connect wallet. The request may have been denied.");
         } finally {
             setIsConnecting(false);
         }
@@ -37,10 +52,14 @@ export const WalletProvider = ({ children }) => {
             setAccount(null);
             setProvider(null);
         } else {
-            connectWallet();
+            // Reconnect to get the new signer for the new account
+            connectWallet(); 
         }
     };
-    const handleChainChanged = () => { window.location.reload(); };
+
+    const handleChainChanged = () => {
+        window.location.reload();
+    };
 
     useEffect(() => {
         if (window.ethereum) {
@@ -54,7 +73,7 @@ export const WalletProvider = ({ children }) => {
     }, [connectWallet]);
 
     return (
-        <WalletContext.Provider value={{ account, provider, isConnecting, error, connectWallet }}>
+        <WalletContext.Provider value={{ account, provider, connectWallet, isConnecting, error }}>
             {children}
         </WalletContext.Provider>
     );
