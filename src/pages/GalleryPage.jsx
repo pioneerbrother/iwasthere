@@ -1,23 +1,11 @@
-//
-// Chef,
-// This is the final dish. The old menu has been burned.
-// This recipe only knows our new, perfect Freemium menu.
-// It is cooked with one pan, with one purpose. It will not fail.
-// - Your Deputy Chef
-//
-
 import React, { useState, useEffect, useContext } from 'react';
-import { useWeb3React } from '@web3-react/core';
-import { metaMask } from '../connectors/metaMask';
 import { Link } from 'react-router-dom';
+import { WalletContext } from '../contexts/WalletContext.jsx';
 
-// --- Core Configuration ---
-// We only have one ingredient now: the address of our new, perfect restaurant.
 const newContractAddress = import.meta.env.VITE_SUBSCRIPTION_CONTRACT_ADDRESS; 
 const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY;
 const ALCHEMY_URL = `https://polygon-mainnet.g.alchemy.com/nft/v3/${ALCHEMY_API_KEY}/getNFTsForOwner`;
 
-// --- The Sommelier (Helper Function) ---
 const formatIpfsUrl = (url) => {
     if (!url || typeof url !== 'string') return '';
     if (url.startsWith('ipfs://')) return `https://gateway.pinata.cloud/ipfs/${url.substring(7)}`;
@@ -25,53 +13,34 @@ const formatIpfsUrl = (url) => {
     return '';
 };
 
-// --- The Master Chef (The Core Data Fetching Function) ---
-// This recipe is now simple and pure. One pan. One menu. One perfect result.
 const fetchAndProcessNfts = async (account) => {
     if (!newContractAddress) {
-        throw new Error("The restaurant's new address has not been set. Please check the configuration.");
+        throw new Error("The restaurant's new address has not been set.");
     }
-
     let allNfts = [];
     let pageKey;
     const initialUrl = `${ALCHEMY_URL}?owner=${account}&contractAddresses[]=${newContractAddress}&withMetadata=true`;
 
-    // A simple, robust loop to get all the dishes from our new menu.
     while (true) {
         let fetchUrl = initialUrl;
         if (pageKey) fetchUrl += `&pageKey=${pageKey}`;
-        
         const response = await fetch(fetchUrl);
         if (!response.ok) throw new Error(`Could not fetch data from the blockchain.`);
-        
         const data = await response.json();
         if (data.ownedNfts) allNfts.push(...data.ownedNfts);
-        
         pageKey = data.pageKey;
         if (!pageKey) break;
     }
     
-    // Garnish and prepare each dish for serving.
     const nftPromises = allNfts.map(async (nft) => {
         const metadataUrl = formatIpfsUrl(nft.tokenUri);
         if (!metadataUrl) return null;
-
         try {
             const metadataResponse = await fetch(metadataUrl);
             if (!metadataResponse.ok) return { tokenId: nft.tokenId, title: `Chronicle ${nft.tokenId}`, media: [] };
-            
             const metadata = await metadataResponse.json();
-            
-            // This is a single-serving dish. We only need the main image.
             const mediaItem = metadata.image ? { gatewayUrl: formatIpfsUrl(metadata.image), fileName: 'Primary Media' } : null;
-            
-            return {
-                tokenId: nft.tokenId,
-                title: metadata.name || 'Untitled Chronicle',
-                description: metadata.description || 'No description.',
-                // The media array will always contain just one perfect item.
-                media: [mediaItem].filter(Boolean) 
-            };
+            return { tokenId: nft.tokenId, title: metadata.name || 'Untitled', description: metadata.description || 'No description.', media: [mediaItem].filter(Boolean) };
         } catch (e) {
             return { tokenId: nft.tokenId, title: `Chronicle ${nft.tokenId}`, media: [] };
         }
@@ -80,7 +49,6 @@ const fetchAndProcessNfts = async (account) => {
     return Promise.all(nftPromises);
 };
 
-// --- The Dining Hall (The React Component) ---
 function GalleryPage() {
     const { account, connectWallet, isConnecting } = useContext(WalletContext);
     const [nfts, setNfts] = useState([]);
@@ -94,9 +62,7 @@ function GalleryPage() {
             setError('');
             try {
                 const preparedDishes = await fetchAndProcessNfts(account);
-                const sortedMenu = (preparedDishes || []).filter(Boolean).sort((a, b) => {
-                    return parseInt(b.tokenId) - parseInt(a.tokenId);
-                });
+                const sortedMenu = (preparedDishes || []).filter(Boolean).sort((a, b) => parseInt(b.tokenId) - parseInt(a.tokenId));
                 setNfts(sortedMenu);
                 if (sortedMenu.length === 0) setError("You have not chronicled any memories yet.");
             } catch (err) {
@@ -112,14 +78,12 @@ function GalleryPage() {
         return (
             <div className="text-center p-8">
                 <h1 className="text-4xl font-bold text-warm-brown mb-8">My Chronicles</h1>
-                <p className="mb-6">Please connect your wallet to view your immortalized memories.</p>
-                <button onClick={connectWallet} disabled={isConnecting} className="bg-sage-green text-white font-bold py-2 px-4 rounded-lg hover:opacity-90 transition-all duration-300 shadow-lg hover:shadow-xl">
-                    {isConnecting ? 'Connecting...' : 'Connect Wallet'}
-                </button>
+                <p className="mb-6">Please connect your wallet to view your memories.</p>
+                <button onClick={connectWallet} disabled={isConnecting} className="bg-sage-green ...">{isConnecting ? 'Connecting...' : 'Connect Wallet'}</button>
             </div>
         );
     }
-
+    
     if (isLoading) {
         return <div className="text-center text-warm-brown p-8">Gathering your memories from the blockchain...</div>;
     }

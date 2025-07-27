@@ -4,7 +4,6 @@ import { Buffer } from 'buffer';
 window.Buffer = Buffer;
 
 import { WalletContext } from '../contexts/WalletContext.jsx';
-
 import SubscriptionContractABI from '../abis/SubscriptionContract.json';
 import ERC20ABI_file from '../abis/ERC20.json';
 const ERC20ABI = ERC20ABI_file.abi;
@@ -23,7 +22,6 @@ const PRIZE_POOL_WALLET = "0xcC853a5bc3f4129353DB6d5f92C781010167D288";
 
 function HomePage() {
     const { account, provider, connectWallet, isConnecting } = useContext(WalletContext);
-
     const [isLoading, setIsLoading] = useState(false);
     const [feedback, setFeedback] = useState("Welcome to the restaurant.");
     const [subscription, setSubscription] = useState({ hasClaimed: false, photos: 0, videos: 0 });
