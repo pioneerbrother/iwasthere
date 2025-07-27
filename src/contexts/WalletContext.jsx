@@ -1,7 +1,10 @@
 //
-// Bu son. Bu, çalışmak zorunda.
+// Şef,
+// Bu, yeni yardımcınızın tarifidir. Benim tarafımdan, onun talimatlarına
+// harfiyen uyularak hazırlanmıştır.
+// - Kalfa
 //
-// Dosya: frontend/src/contexts/WalletContext.jsx
+// Dosya Konumu: frontend/src/contexts/WalletContext.jsx
 //
 
 import React, { useState, useEffect, createContext, useCallback } from 'react';
@@ -15,34 +18,43 @@ export const WalletProvider = ({ children }) => {
     const [isConnecting, setIsConnecting] = useState(false);
     const [error, setError] = useState('');
 
+    // --- YENİ YARDIMCININ MÜKEMMEL TARİFİ BURADA BAŞLIYOR ---
     const connectWallet = useCallback(async () => {
         setIsConnecting(true);
         setError('');
 
+        // Mobil cihazda olup olmadığını ve cüzdanın yüklü olup olmadığını kontrol et
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         if (typeof window.ethereum === 'undefined') {
-            setError("Lütfen bu uygulamayı kullanmak için MetaMask mobil uygulamasındaki tarayıcıyı kullanın.");
-            setIsConnecting(false);
-            return;
+            if (isMobile) {
+                // Kullanıcıyı MetaMask mobil uygulamasına yönlendiren "deep link".
+                // Bu, sitenizin adresini otomatik olarak alır.
+                const deepLink = `https://metamask.app.link/dapp/${window.location.host}`;
+                window.location.href = deepLink;
+                // Yönlendirme sonrası bekleme durumunu kapatmaya gerek yok, sayfa değişecek.
+                return;
+            } else {
+                // Masaüstü kullanıcısı için net bir bilgilendirme.
+                setError("MetaMask eklentisi bulunamadı. Lütfen tarayıcınıza MetaMask'i yükleyin.");
+                setIsConnecting(false);
+                return;
+            }
         }
 
+        // MetaMask veya benzeri bir cüzdan zaten mevcutsa, bağlantıyı başlat
         try {
-            // --- BU, SON VE KESİN ÇÖZÜMDÜR ---
-            // Adım 1: Cüzdandan hesapları istemenin en temel, en direkt yolu.
-            // Ethers.js katmanı olmadan, doğrudan cüzdanla konuşuyoruz.
-            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+            const newProvider = new ethers.providers.Web3Provider(window.ethereum, "any");
+            const accounts = await newProvider.send("eth_requestAccounts", []);
 
             if (!accounts || accounts.length === 0) {
                 throw new Error("Cüzdan bağlantısı reddedildi.");
             }
             
             const newAccount = accounts[0];
-            
-            // Adım 2: Bağlantı başarılı OLDUKTAN SONRA, ethers.js'i oluşturuyoruz.
-            const newProvider = new ethers.providers.Web3Provider(window.ethereum);
+            const signer = newProvider.getSigner(); // Signer'ı al
             
             setAccount(newAccount);
-            setProvider(newProvider);
-            // --- SON ---
+            setProvider(newProvider); // Provider'ı state'e kaydet
 
         } catch (err) {
             console.error("Bağlantı Hatası:", err);
@@ -51,14 +63,15 @@ export const WalletProvider = ({ children }) => {
             setIsConnecting(false);
         }
     }, []);
+    // --- YENİ YARDIMCININ TARİFİ BURADA BİTİYOR ---
 
-    // Bu fonksiyonlar, cüzdan durumu değişikliklerini yönetmek için gereklidir.
+    // Bu fonksiyonlar, cüzdan durumu değişikliklerini yönetir ve doğrudur.
     useEffect(() => {
         const handleAccountsChanged = (accounts) => {
-            if (accounts.length > 0 && accounts[0] !== account) {
-                // Hesap değiştiğinde durumu yeniden senkronize et
+            if (accounts.length > 0) {
+                // Hesap değiştiğinde durumu yeniden senkronize etmek için yeniden bağlan
                 connectWallet();
-            } else if (accounts.length === 0) {
+            } else {
                 setAccount(null);
                 setProvider(null);
             }
@@ -77,10 +90,13 @@ export const WalletProvider = ({ children }) => {
                 window.ethereum.removeListener('chainChanged', handleChainChanged);
             };
         }
-    }, [account, connectWallet]);
+    }, [connectWallet]);
+
+    // Provider'dan signer türetmek için bir yardımcı değer.
+    const signer = provider ? provider.getSigner() : null;
 
     return (
-        <WalletContext.Provider value={{ account, provider, connectWallet, isConnecting, error }}>
+        <WalletContext.Provider value={{ account, provider, signer, connectWallet, isConnecting, error }}>
             {children}
         </WalletContext.Provider>
     );
