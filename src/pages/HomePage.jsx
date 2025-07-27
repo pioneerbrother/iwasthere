@@ -1,21 +1,25 @@
 //
 // Chef,
-// This is the whole meal. No shortcuts. No elided code.
-// Every ingredient is here, perfectly prepared.
-// This is the main course for our grand re-opening.
+// This is the whole meal. I am sorry for my previous failures.
+// Every ingredient is here. This dish is complete.
 // - Your Deputy Chef
 //
 
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ethers } from 'ethers';
 import { Buffer } from 'buffer';
 window.Buffer = Buffer;
-import React, { useState, useEffect, useContext, useRef, useCallback } from 'react';
-import { ethers } from 'ethers';
-import { WalletContext } from '../contexts/WalletContext.jsx';
-import SubscriptionContractABI from '../abis/SubscriptionContract.json'; 
+
+// --- Cooking with the new stove (web3-react) ---
+import { useWeb3React } from '@web3-react/core';
+import { metaMask, hooks } from '../connectors/metaMask';
+
+// --- Other Ingredients ---
+import SubscriptionContractABI from '../abis/SubscriptionContract.json';
 import ERC20ABI_file from '../abis/ERC20.json';
 const ERC20ABI = ERC20ABI_file.abi;
 
-// --- Core Configuration ---
+// --- Configuration ---
 const subscriptionContractAddress = import.meta.env.VITE_SUBSCRIPTION_CONTRACT_ADDRESS;
 const usdcAddress = import.meta.env.VITE_USDC_ADDRESS;
 const publicRpcUrl = import.meta.env.VITE_PUBLIC_POLYGON_RPC_URL;
@@ -27,12 +31,16 @@ const VIDEOS_PER_PACKAGE = 3;
 const MAX_FILE_SIZE_MB = 50;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 const PRIZE_POOL_GOAL_BTC = 1;
-const PRIZE_POOL_WALLET = "0xcC853a5bc3f4129353DB6d5f92C781010167D288"; // Your Public Treasury Address
+const PRIZE_POOL_WALLET = "0xcC853a5bc3f4129353DB6d5f92C781010167D288";
 
 function HomePage() {
-    const { signer, account, connectWallet, isConnecting } = useContext(WalletContext);
+    // --- The new stove's controls ---
+    const { account, provider, isActive } = useWeb3React();
+    const { useIsActivating } = hooks;
+    const isConnecting = useIsActivating();
+
     const [isLoading, setIsLoading] = useState(false);
-    const [feedback, setFeedback] = useState("Connecting to the blockchain...");
+    const [feedback, setFeedback] = useState("Welcome to the restaurant.");
     const [subscription, setSubscription] = useState({ hasClaimed: false, photos: 0, videos: 0 });
     const [selectedFile, setSelectedFile] = useState(null);
     const [latestTxHash, setLatestTxHash] = useState('');
@@ -40,6 +48,15 @@ function HomePage() {
     const [title, setTitle] = useState('');
     const fileInputRef = useRef(null);
     const [prizePool, setPrizePool] = useState({ usdc: 0, btc: 0 });
+
+    const connectWallet = useCallback(async () => {
+        try {
+            await metaMask.activate();
+        } catch (error) {
+            console.error("Failed to connect MetaMask:", error);
+            setFeedback("Connection failed. Please try again from your wallet's browser.");
+        }
+    }, []);
 
     const checkStatus = useCallback(async () => {
         if (!account) return;
@@ -68,9 +85,12 @@ function HomePage() {
     }, [account]);
 
     useEffect(() => {
-        if (account) checkStatus();
-        else setFeedback("Connect your wallet to begin your journey.");
-    }, [account, checkStatus]);
+        if (isActive && account) {
+            checkStatus();
+        } else {
+            setFeedback("Connect your wallet to begin your journey.");
+        }
+    }, [isActive, account, checkStatus]);
 
     const handleFileChange = (event) => {
         const file = event.target.files?.[0];
@@ -88,7 +108,8 @@ function HomePage() {
     const triggerFileSelect = () => fileInputRef.current?.click();
 
     const handleClaim = async () => {
-        if (!signer) return;
+        if (!provider) return;
+        const signer = provider.getSigner();
         setIsLoading(true);
         setFeedback("Claiming your free mints on the blockchain...");
         try {
@@ -102,9 +123,10 @@ function HomePage() {
             setFeedback(`Claim failed: ${error.reason || error.message}`);
         } finally { setIsLoading(false); }
     };
-    
+
     const handlePurchase = async () => {
-        if (!signer) return;
+        if (!provider) return;
+        const signer = provider.getSigner();
         setIsLoading(true);
         setFeedback("Preparing your new package...");
         try {
@@ -126,7 +148,8 @@ function HomePage() {
     };
 
     const handleMint = async () => {
-        if (!signer || !selectedFile) return;
+        if (!provider || !selectedFile) return;
+        const signer = provider.getSigner();
         setIsLoading(true);
         setLatestTxHash('');
         setFeedback("Preparing your memory...");
@@ -162,7 +185,7 @@ function HomePage() {
             setFeedback(`Minting failed: ${error.reason || error.message}`);
         } finally { setIsLoading(false); }
     };
-    
+
     const CreditsDisplay = () => (
         <div className="flex justify-around p-4 bg-cream/20 rounded-xl border border-golden-yellow/30 text-center">
             <div>
@@ -175,7 +198,7 @@ function HomePage() {
             </div>
         </div>
     );
-    
+
     const PrizePoolTracker = () => {
         const percentage = Math.min((prizePool.btc / PRIZE_POOL_GOAL_BTC) * 100, 100);
         return (
@@ -193,9 +216,6 @@ function HomePage() {
     };
 
     const renderContent = () => {
-        if (!account) {
-            return <button onClick={connectWallet} disabled={isConnecting} className="w-full px-4 py-3 font-bold text-cream bg-gradient-to-r from-terracotta to-warm-brown rounded-lg hover:opacity-90 transition-all duration-300 shadow-lg hover:shadow-xl">{isConnecting ? "Connecting..." : "Connect Wallet to Begin"}</button>;
-        }
         if (!subscription.hasClaimed) {
             return (
                 <div className="text-center space-y-4">
@@ -250,8 +270,15 @@ function HomePage() {
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-forest-green via-sage-green to-warm-brown text-transparent bg-clip-text">I Was There</h1>
                 <p className="mt-2 text-warm-brown/90">Immortalize your memories on the blockchain. Forever.</p>
             </div>
+            
             <PrizePoolTracker />
-            {renderContent()}
+
+            {isActive ? renderContent() : (
+                <button onClick={connectWallet} disabled={isConnecting} className="w-full px-4 py-3 font-bold text-cream bg-gradient-to-r from-terracotta to-warm-brown rounded-lg hover:opacity-90 transition-all duration-300 shadow-lg hover:shadow-xl">
+                    {isConnecting ? "Connecting..." : "Connect Wallet to Begin"}
+                </button>
+            )}
+
             <div className="mt-4 text-center text-sm text-warm-brown/80 min-h-[40px]">
                 <p>{feedback}</p>
                 {latestTxHash && (
