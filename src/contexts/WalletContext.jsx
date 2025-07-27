@@ -1,10 +1,7 @@
 //
-// Chef,
-// This is the final dish. Cooked on the right stove.
-// For the families.
-// - The Cook
+// Bu son. Bu, çalışmak zorunda.
 //
-// File: frontend/src/contexts/WalletContext.jsx
+// Dosya: frontend/src/contexts/WalletContext.jsx
 //
 
 import React, { useState, useEffect, createContext, useCallback } from 'react';
@@ -21,56 +18,66 @@ export const WalletProvider = ({ children }) => {
     const connectWallet = useCallback(async () => {
         setIsConnecting(true);
         setError('');
+
         if (typeof window.ethereum === 'undefined') {
-            setError("Please install MetaMask to use this app.");
+            setError("Lütfen bu uygulamayı kullanmak için MetaMask mobil uygulamasındaki tarayıcıyı kullanın.");
             setIsConnecting(false);
             return;
         }
-        try {
-            // --- THIS IS THE FINAL, CRITICAL FIX ---
-            // We are now using the correct, professional stove for a live restaurant.
-            // A Web3Provider can handle transactions and sign messages.
-            const newProvider = new ethers.providers.Web3Provider(window.ethereum, "any");
-            // --- END OF THE FINAL FIX ---
 
-            await newProvider.send("eth_requestAccounts", []);
-            const signer = newProvider.getSigner();
-            const newAccount = await signer.getAddress();
+        try {
+            // --- BU, SON VE KESİN ÇÖZÜMDÜR ---
+            // Adım 1: Cüzdandan hesapları istemenin en temel, en direkt yolu.
+            // Ethers.js katmanı olmadan, doğrudan cüzdanla konuşuyoruz.
+            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+
+            if (!accounts || accounts.length === 0) {
+                throw new Error("Cüzdan bağlantısı reddedildi.");
+            }
             
-            setProvider(newProvider);
+            const newAccount = accounts[0];
+            
+            // Adım 2: Bağlantı başarılı OLDUKTAN SONRA, ethers.js'i oluşturuyoruz.
+            const newProvider = new ethers.providers.Web3Provider(window.ethereum);
+            
             setAccount(newAccount);
+            setProvider(newProvider);
+            // --- SON ---
+
         } catch (err) {
-            console.error("Failed to connect wallet", err);
-            setError("Failed to connect wallet. The request may have been denied.");
+            console.error("Bağlantı Hatası:", err);
+            setError(err.message || "Cüzdan bağlanamadı. İstek kullanıcı tarafından reddedilmiş olabilir.");
         } finally {
             setIsConnecting(false);
         }
     }, []);
 
-    const handleAccountsChanged = (accounts) => {
-        if (accounts.length === 0) {
-            setAccount(null);
-            setProvider(null);
-        } else {
-            // Reconnect to get the new signer for the new account
-            connectWallet(); 
-        }
-    };
-
-    const handleChainChanged = () => {
-        window.location.reload();
-    };
-
+    // Bu fonksiyonlar, cüzdan durumu değişikliklerini yönetmek için gereklidir.
     useEffect(() => {
+        const handleAccountsChanged = (accounts) => {
+            if (accounts.length > 0 && accounts[0] !== account) {
+                // Hesap değiştiğinde durumu yeniden senkronize et
+                connectWallet();
+            } else if (accounts.length === 0) {
+                setAccount(null);
+                setProvider(null);
+            }
+        };
+
+        const handleChainChanged = () => {
+            window.location.reload();
+        };
+
         if (window.ethereum) {
             window.ethereum.on('accountsChanged', handleAccountsChanged);
             window.ethereum.on('chainChanged', handleChainChanged);
+
             return () => {
                 window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
                 window.ethereum.removeListener('chainChanged', handleChainChanged);
             };
         }
-    }, [connectWallet]);
+    }, [account, connectWallet]);
 
     return (
         <WalletContext.Provider value={{ account, provider, connectWallet, isConnecting, error }}>
