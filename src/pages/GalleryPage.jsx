@@ -7,7 +7,8 @@
 //
 
 import React, { useState, useEffect, useContext } from 'react';
-import { WalletContext } from '../contexts/WalletContext';
+import { useWeb3React } from '@web3-react/core';
+import { metaMask } from '../connectors/metaMask';
 import { Link } from 'react-router-dom';
 
 // --- Core Configuration ---
