@@ -1,9 +1,3 @@
-//
-// Chef, this is the backend recipe.
-// It is designed to be the clean, efficient engine room of our kitchen.
-// - Your Deputy Chef
-//
-
 const fetch = require('node-fetch');
 const FormData = require('form-data');
 const { ethers } = require('ethers');
@@ -25,6 +19,11 @@ exports.handler = async function(event, context) {
 
         if (!file || !walletAddress || !signature) {
              throw new Error("Malformed request: Missing a required ingredient.");
+        }
+
+        // CHANGE: Added server-side validation to reject video files.
+        if (file.fileType.startsWith('video/')) {
+            throw new Error("Video uploads are not supported at this time.");
         }
 
         const recoveredAddress = ethers.utils.verifyMessage(`ChronicleMe: Verifying access for ${walletAddress} to upload media and request mint.`, signature);

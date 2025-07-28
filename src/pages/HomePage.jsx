@@ -14,7 +14,7 @@ const publicRpcUrl = import.meta.env.VITE_PUBLIC_POLYGON_RPC_URL;
 
 const SUBSCRIPTION_PRICE_USDC = 2;
 const PHOTOS_PER_PACKAGE = 30;
-const VIDEOS_PER_PACKAGE = 3;
+const VIDEOS_PER_PACKAGE = 0; // CHANGE: Set to 0 to eliminate video credits from logic.
 const MAX_FILE_SIZE_MB = 50;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 const PRIZE_POOL_GOAL_BTC = 1;
@@ -24,7 +24,7 @@ function HomePage() {
     const { account, provider, connectWallet, isConnecting } = useContext(WalletContext);
     const [isLoading, setIsLoading] = useState(false);
     const [feedback, setFeedback] = useState("Welcome to the restaurant.");
-    const [subscription, setSubscription] = useState({ hasClaimed: false, photos: 0, videos: 0 });
+    const [subscription, setSubscription] = useState({ hasClaimed: false, photos: 0 }); // CHANGE: Removed video from state.
     const [selectedFile, setSelectedFile] = useState(null);
     const [latestTxHash, setLatestTxHash] = useState('');
     const [description, setDescription] = useState('');
@@ -38,9 +38,9 @@ function HomePage() {
         const contract = new ethers.Contract(subscriptionContractAddress, SubscriptionContractABI.abi, readOnlyProvider);
         const usdcContract = new ethers.Contract(usdcAddress, ERC20ABI, readOnlyProvider);
         try {
-            const [photosLeft, videosLeft, hasClaimed, poolBalance] = await Promise.all([
+            // CHANGE: Removed the unnecessary videoCredits call.
+            const [photosLeft, hasClaimed, poolBalance] = await Promise.all([
                 contract.photoCredits(account),
-                contract.videoCredits(account),
                 contract.hasClaimedFreePackage(account),
                 usdcContract.balanceOf(PRIZE_POOL_WALLET)
             ]);
@@ -48,9 +48,9 @@ function HomePage() {
             const btcPrice = 120000;
             const btcEquivalent = usdcBalance / btcPrice;
             setPrizePool({ usdc: usdcBalance, btc: btcEquivalent });
-            setSubscription({ hasClaimed, photos: Number(photosLeft), videos: Number(videosLeft) });
+            setSubscription({ hasClaimed, photos: Number(photosLeft) }); // CHANGE: Updated state without video.
             if (!hasClaimed) setFeedback("Your journey begins. Claim your free package to start.");
-            else if (Number(photosLeft) > 0 || Number(videosLeft) > 0) setFeedback("Welcome back! Select a file to immortalize.");
+            else if (Number(photosLeft) > 0) setFeedback("Welcome back! Select a file to immortalize."); // CHANGE: Simplified logic.
             else setFeedback("You have used all your credits. Purchase a new package to continue.");
         } catch (error) {
             console.error("Could not check status:", error);
@@ -91,7 +91,7 @@ function HomePage() {
             const claimTx = await contract.claimFreePackage();
             await claimTx.wait(1);
             setLatestTxHash(claimTx.hash);
-            setFeedback("🎉 Welcome! Your 33 free mints are now available.");
+            setFeedback(`🎉 Welcome! Your ${PHOTOS_PER_PACKAGE} free photo mints are now available.`); // CHANGE: Updated feedback text.
             await checkStatus();
         } catch (error) {
             setFeedback(`Claim failed: ${error.reason || error.message}`);
@@ -142,12 +142,12 @@ function HomePage() {
             if (!response.ok) throw new Error(result.error);
             const ipfsMetadataCid = `ipfs://${result.metadataCID}`;
             const contract = new ethers.Contract(subscriptionContractAddress, SubscriptionContractABI.abi, signer);
-            const isVideo = selectedFile.type.startsWith('video/');
-            let mintTx;
+            
+            // CHANGE: Removed all video-specific logic. Only mints photos now.
             setFeedback("Minting your Chronicle on the blockchain...");
-            if (isVideo) mintTx = await contract.mintVideo(ipfsMetadataCid);
-            else mintTx = await contract.mintPhoto(ipfsMetadataCid);
+            const mintTx = await contract.mintPhoto(ipfsMetadataCid);
             await mintTx.wait(1);
+
             setFeedback("🎉 Your memory is now immortal! It is forever yours.");
             setLatestTxHash(mintTx.hash);
             setSelectedFile(null);
@@ -161,14 +161,11 @@ function HomePage() {
     };
 
     const CreditsDisplay = () => (
+        // CHANGE: Simplified to only show photos.
         <div className="flex justify-around p-4 bg-cream/20 rounded-xl border border-golden-yellow/30 text-center">
             <div>
                 <span className="text-sm text-warm-brown/80 uppercase tracking-wider">Photo Mints</span>
                 <p className="text-2xl font-bold text-warm-brown">{subscription.photos}</p>
-            </div>
-            <div>
-                <span className="text-sm text-warm-brown/80 uppercase tracking-wider">Video Mints</span>
-                <p className="text-2xl font-bold text-warm-brown">{subscription.videos}</p>
             </div>
         </div>
     );
@@ -194,11 +191,13 @@ function HomePage() {
             return (
                 <div className="text-center space-y-4">
                     <p className="text-warm-brown/90">Your journey to immortalize your memories starts here.</p>
-                    <button onClick={handleClaim} disabled={isLoading} className="w-full px-4 py-3 font-bold text-cream bg-gradient-to-r from-sage-green to-forest-green rounded-lg hover:opacity-90 transition-all duration-300 shadow-lg hover:shadow-xl">{isLoading ? "Claiming..." : `Claim ${PHOTOS_PER_PACKAGE} Free Photo & ${VIDEOS_PER_PACKAGE} Free Video Mints`}</button>
+                    {/* CHANGE: Updated button text to be photo-only. */}
+                    <button onClick={handleClaim} disabled={isLoading} className="w-full px-4 py-3 font-bold text-cream bg-gradient-to-r from-sage-green to-forest-green rounded-lg hover:opacity-90 transition-all duration-300 shadow-lg hover:shadow-xl">{isLoading ? "Claiming..." : `Claim ${PHOTOS_PER_PACKAGE} Free Photo Mints`}</button>
                 </div>
             );
         }
-        if (subscription.photos === 0 && subscription.videos === 0) {
+        // CHANGE: Simplified credit check to only look at photos.
+        if (subscription.photos === 0) {
             return (
                 <div className="text-center space-y-4">
                      <CreditsDisplay />
@@ -211,7 +210,8 @@ function HomePage() {
             <div className="space-y-6">
                 <CreditsDisplay />
                 <div onClick={triggerFileSelect} className="flex flex-col items-center justify-center w-full p-6 border-2 border-dashed border-warm-brown/40 rounded-lg cursor-pointer hover:border-golden-yellow/60 hover:bg-golden-yellow/10 transition-colors">
-                    <input type="file" accept="image/*,video/*" onChange={handleFileChange} ref={fileInputRef} className="hidden" />
+                    {/* CHANGE: Removed "video/*" from the accept attribute. */}
+                    <input type="file" accept="image/*" onChange={handleFileChange} ref={fileInputRef} className="hidden" />
                     {selectedFile ? (
                         <div className="text-center text-warm-brown/90">
                            <p className="font-semibold">Selected: {selectedFile.name}</p>
