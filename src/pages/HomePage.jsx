@@ -97,9 +97,8 @@ function HomePage() {
             setFeedback(`Claim failed: ${error.reason || error.message}`);
         } finally { setIsLoading(false); }
     };
-
-   const handlePurchase = async () => {
-    if (!provider || !account) return;
+const handlePurchase = async () => {
+    if (!provider) return;
     const signer = provider.getSigner();
     setIsLoading(true);
     setFeedback("Preparing your new package...");
@@ -107,24 +106,10 @@ function HomePage() {
         const usdc = new ethers.Contract(usdcAddress, ERC20ABI, signer);
         const contract = new ethers.Contract(subscriptionContractAddress, SubscriptionContractABI.abi, signer);
         const priceWei = ethers.utils.parseUnits(SUBSCRIPTION_PRICE_USDC.toString(), 6);
-
-        // --- THE FIX IS HERE ---
-        // Step 1: Check existing allowance
-        setFeedback("Checking your USDC approval status...");
-        const existingAllowance = await usdc.allowance(account, contract.address);
-
-        // Step 2: If allowance is not enough, ask for approval.
-        if (existingAllowance.lt(priceWei)) {
-            setFeedback("Please approve the USDC payment in your wallet...");
-            const approveTx = await usdc.approve(contract.address, priceWei);
-            await approveTx.wait(1);
-            setFeedback("Approval successful! Finalizing purchase...");
-        } else {
-            setFeedback("Approval found! Finalizing your purchase...");
-        }
-        // --- END OF THE FIX ---
-
-        // Step 3: Proceed with the purchase
+        setFeedback("Please approve the USDC payment in your wallet...");
+        const approveTx = await usdc.approve(contract.address, priceWei);
+        await approveTx.wait(1);
+        setFeedback("Finalizing your purchase on the blockchain...");
         const purchaseTx = await contract.purchaseCreditPackage();
         await purchaseTx.wait(1);
         setLatestTxHash(purchaseTx.hash);
@@ -132,9 +117,7 @@ function HomePage() {
         await checkStatus();
     } catch (error) {
         setFeedback(`Purchase failed: ${error.reason || error.message}`);
-    } finally {
-        setIsLoading(false);
-    }
+    } finally { setIsLoading(false); }
 };
 
     const handleMint = async () => {
