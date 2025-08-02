@@ -3,11 +3,15 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { WalletProvider } from './contexts/WalletContext';
 import HomePage from './pages/HomePage';
 import GalleryPage from './pages/GalleryPage';
+import CommunityBanner from './components/CommunityBanner';
 
 function App() {
   return (
     <WalletProvider>
       <Router>
+         {/* --- THIS IS THE NEW CODE --- */}
+        <CommunityBanner /> 
+        {/* --- END OF NEW CODE --- */}
         <div className="min-h-screen bg-cream text-warm-brown font-sans flex flex-col items-center p-4">
           <header className="w-full max-w-6xl mx-auto py-4">
             <Link to="/" className="flex items-center justify-center space-x-2">
